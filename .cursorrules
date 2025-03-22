@@ -1,0 +1,47 @@
+# iDocument Project Intelligence
+
+## Project Structure
+- Using Next.js App Router for routing
+- Feature-based organization pattern
+- Leveraging React Server Components where possible
+- Client components used for interactive elements
+
+## Code Style
+- TypeScript with strict type safety
+- Functional component approach
+- Server Actions for form submissions
+- Tailwind CSS for styling with shadcn/ui components
+
+## Authentication Flow
+- NextAuth.js with GitHub OAuth provider
+- Token-based session management
+- Protected routes with middleware
+
+## Database Pattern
+- Supabase for data storage
+- Real-time subscriptions for collaborative features
+- Relational schema for users, repositories, and reviews
+
+## AI Processing
+- LangChain for OpenAI integration
+- LangGraph for workflow orchestration
+- Structured prompting for code analysis
+- Context management for token optimization
+
+## GitHub Integration
+- OAuth App for authentication
+- Webhooks for PR events
+- API calls for repository data
+
+## Component Organization
+- /app: Main application routes
+- /components: Reusable UI components
+- /lib: Utility functions and types
+- /hooks: Custom React hooks
+- /services: External service integration
+
+## User Preferences
+- Clean, minimal UI
+- Dark mode by default with light mode toggle
+- Focus on code readability in reviews
+- Actionable suggestions with inline context 
