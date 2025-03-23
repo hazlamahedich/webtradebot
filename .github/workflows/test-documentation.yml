@@ -1,0 +1,58 @@
+name: Documentation Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'lib/ai/**'
+      - 'app/api/webhooks/documentation-processor/**'
+      - '__tests__/ai/**'
+      - '__tests__/api/webhooks/documentation-processor/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'lib/ai/**'
+      - 'app/api/webhooks/documentation-processor/**'
+      - '__tests__/ai/**'
+      - '__tests__/api/webhooks/documentation-processor/**'
+  workflow_dispatch:
+
+jobs:
+  test-documentation:
+    runs-on: ubuntu-latest
+    env:
+      NEXT_PUBLIC_APP_URL: http://localhost:3000
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run AI component tests
+        run: npm run test:ai
+
+      - name: Run documentation generator core tests
+        run: npm run test:docs
+
+      - name: Run documentation webhook tests
+        run: npm run test:docs:webhooks
+
+      - name: Run E2E tests (disabled in CI)
+        if: false
+        run: npm run test:docs:e2e
+
+      - name: Upload test coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage
+          path: coverage/ 

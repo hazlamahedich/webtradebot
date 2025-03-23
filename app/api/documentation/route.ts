@@ -4,8 +4,8 @@ import { db } from "@/lib/supabase/db";
 import { startDocumentationGeneration } from "@/lib/ai/documentation-generator";
 import { GitHubClient } from "@/lib/github/api";
 
-// Configure as Edge Function for longer timeout
-export const runtime = 'edge';
+// Remove Edge Runtime configuration to be compatible with Vercel free tier
+// export const runtime = 'edge';
 
 export async function POST(request: Request) {
   try {

@@ -142,4 +142,34 @@
 - Missing account records: Use fix-github-account API endpoint
 - Repository already exists: Option to force-add with confirmation
 - User ID mismatch: Automatic migration of repositories between user IDs
-- Authentication failures: Session diagnostics in debug endpoint 
+- Authentication failures: Session diagnostics in debug endpoint
+
+## Testing Technology Stack
+
+### Unit and Integration Testing
+- **Jest**: Primary testing framework
+- **ts-jest**: TypeScript support for Jest tests
+- **@testing-library/react**: For UI component testing
+- **@testing-library/user-event**: For simulating user interactions
+- **jest-environment-jsdom**: Browser-like environment for UI tests
+
+### Test Organization
+- **Test Directory Structure**:
+  - `__tests__/ai/`: AI component tests
+  - `__tests__/api/webhooks/`: Webhook processing tests
+  - `__tests__/components/`: UI component tests
+  - `__tests__/pages/`: Next.js page tests
+  - `__tests__/lib/`: Utility function tests
+
+### Mock Infrastructure
+- **jest.mock()**: Mock external dependencies
+- **jest.fn()**: Create mock functions with predefined returns
+- **jest.isolateModules()**: Isolate module imports to prevent conflicts
+- **__mocks__/**: Directory for centralized mock modules
+- **moduleNameMapper** in Jest config to redirect problematic imports
+
+### CI Testing
+- **GitHub Actions**: Automated test workflow
+- **Package Scripts**: Custom test commands in package.json
+- **Coverage Reports**: Generated with Jest's coverage options
+- **Artifact uploads**: Store test results for analysis 

@@ -336,3 +336,33 @@ export async function createCodeReviewForPR(owner: string, repo: string, pullNum
 5. **Smart Suggestions**: Review results include specific suggestions with locations
 6. **Automated Publishing**: Comments are automatically posted to GitHub PRs
 7. **Event-Driven Architecture**: Webhooks trigger reviews without user intervention
+
+## AI Testing Architecture
+
+### Test Organization Pattern
+- Tests are organized by AI component functionality
+- Each major AI feature has dedicated test files:
+  - `code-review-minimal.test.ts` - Core code review functionality
+  - `documentation-prompts.test.ts` - Prompt template testing
+  - `models.test.ts` - AI model configuration tests
+  - `pr-review-integration.test.ts` - PR review workflow
+- Mock modules are used to avoid duplicate declaration issues
+- Jest isolation is used to prevent test interference
+
+### Mock System
+- External dependencies are consistently mocked:
+  - OpenAI API calls return predefined responses
+  - GitHub API operations use consistent mock patterns
+  - Database operations use Jest mock functions
+  - LangChain components return structured mock data
+- Mock modules are centralized in `__mocks__` directory
+- Virtual mocks used for problematic modules with `{ virtual: true }`
+
+### CI Integration
+- GitHub Actions workflow defined in `.github/workflows/test-documentation.yml`
+- CI runs different test groups:
+  - AI component tests
+  - Documentation generator core tests
+  - Documentation webhook tests
+- Test coverage artifacts are uploaded for analysis
+- Configuration uses environment variables for database and API keys

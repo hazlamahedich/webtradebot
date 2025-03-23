@@ -3,8 +3,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/supabase/db";
 import { Documentation } from "@/lib/ai/types";
 
-// Configure as Edge Function
-export const runtime = 'edge';
+// Remove Edge Runtime for Vercel free tier compatibility
+// export const runtime = 'edge';
 
 export async function PUT(request: Request) {
   try {

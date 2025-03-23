@@ -9,7 +9,13 @@
     "lint": "next lint",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:reviews": "jest --testMatch=\"**/__tests__/reviews/**/*.test.[jt]s?(x)\""
+    "test:reviews": "jest --testMatch=\"**/__tests__/reviews/**/*.test.[jt]s?(x)\"",
+    "test:docs": "jest --testMatch=\"**/__tests__/ai/documentation-generator.test.[jt]s?(x)\"",
+    "test:docs:webhooks": "jest --testMatch=\"**/__tests__/api/webhooks/documentation-processor.test.[jt]s?(x)\"",
+    "test:docs:all": "jest --testMatch=\"{**/__tests__/ai/documentation-generator.test.[jt]s?(x),**/__tests__/api/webhooks/documentation-processor.test.[jt]s?(x)}\"",
+    "test:docs:e2e": "ts-node scripts/test-documentation-generation.ts",
+    "test:coverage": "jest --coverage",
+    "test:ai": "jest --testMatch=\"**/__tests__/ai/{code-review-minimal,documentation-prompts,models,pr-review-integration}.test.[jt]s?(x)\""
   },
   "dependencies": {
     "@langchain/core": "^0.3.42",

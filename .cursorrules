@@ -71,4 +71,20 @@
 - This can be fixed by using the diagnostic tool in the Connect Repository form
 - Or by logging out and logging back in with the updated auth system
 - Two user records with the same GitHub information can cause connection issues
-- Repositories may be associated with the wrong user ID (UUID vs GitHub ID) 
+- Repositories may be associated with the wrong user ID (UUID vs GitHub ID)
+
+## AI Component Testing Pattern
+- AI tests should be isolated using Jest's isolateModules when dealing with imports
+- External dependencies (OpenAI, GitHub, Database) should always be mocked
+- Virtual mocks with { virtual: true } should be used for modules with duplicate declarations
+- Tests should be organized by component functionality
+- Central mock modules should be placed in the __mocks__ directory
+- The jest.config.js moduleNameMapper redirects problematic imports
+- Package.json contains specialized test scripts for running specific test suites
+- The GitHub Actions workflow in .github/workflows/test-documentation.yml runs all tests
+
+## Known Issues in Testing
+- The documentation-generator.test.ts has LangGraph dependency issues
+- Some mock TypeScript types cause linter errors that can be ignored
+- The code-review.ts file has duplicate declarations requiring special mocking
+- When running tests, the test pattern should explicitly list files to include instead of using wildcards 

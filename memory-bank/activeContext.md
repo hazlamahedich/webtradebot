@@ -114,4 +114,95 @@ The repository connection system now includes:
 ## Known Issues
 - Two user records may exist for the same GitHub user (one with UUID, one with GitHub ID)
 - Repositories may be associated with the UUID user ID instead of GitHub ID
+- Fix repositories page can update repository user associations
+
+## Current Focus
+
+### AI Component Testing
+- Created comprehensive test infrastructure for AI components
+- Implemented tests for code review, documentation prompts, and models
+- Fixed issues with conflicting declarations by creating mock modules
+- Updated GitHub workflow to include AI component tests
+- Added detailed README documentation for AI test structure
+
+### In Progress
+- Enhancing test coverage for AI components
+- Identifying and fixing linter errors in test files
+- Addressing LangGraph dependency issues in documentation generator tests
+
+### Next Steps
+- Implement more granular tests for individual AI functions
+- Add integration tests with realistic data
+- Improve mocks for LangChain/LangGraph to return structured responses
+- Test edge cases like large repositories and rate limiting scenarios
+
+## Next Steps
+1. Create the proper GitHub OAuth configuration
+2. Implement the authentication flow with NextAuth.js
+3. Complete the Supabase database schema for users, repositories, and reviews
+4. Create the basic UI layout with header, sidebar, and main content area
+5. Implement the initial GitHub integration for accessing repositories
+6. Test and refine the edge-optimized processing system
+7. Implement client-side streaming UI for progressive loading
+8. Monitor performance and adjust chunking strategy as needed
+9. Enhance the code review system:
+   - Add a UI for viewing review history and status
+   - Implement review filtering and sorting
+   - Add manual review triggering functionality
+   - Create review detail page with comprehensive analysis
+   - Implement review feedback mechanism
+10. Begin implementing other Phase 3 enhancements:
+   - Team collaboration features
+   - Analytics and insights dashboard
+   - Advanced review options
+   - Enhanced caching strategies
+   - Fallback mechanisms for processing failures
+11. Clean up duplicate user records
+12. Ensure consistent user ID usage across the application
+13. Improve GitHub API error handling for repository connections
+14. Add repository synchronization features for connected repositories
+
+## Active Decisions
+1. Using Next.js App Router for modern React Server Components approach
+2. Choosing shadcn/ui for flexible, accessible UI components
+3. Leveraging LangChain and LangGraph for modular AI workflow architecture
+4. Using Supabase for database, authentication, real-time features, and caching
+5. Implementing GitHub OAuth for seamless developer experience
+6. Deploying with Vercel (free tier) with optimized serverless architecture
+7. Building the Documentation Generator as a separate feature with its own LangGraph workflow
+8. Using Edge Runtime for longer-running AI operations
+9. Implementing chunked processing to work within serverless constraints
+10. Adding caching to optimize performance and reduce API costs
+
+## Current Considerations
+- Ensuring secure handling of GitHub tokens and repository data
+- Optimizing the AI review and documentation workflows for performance and cost
+- Designing the database schema for scalability
+- Planning the proper permission system for team collaboration
+- Structuring the codebase for maintainability and future expansion
+- Ensuring CI/CD pipeline effectiveness
+- Balancing documentation quality with generation speed
+- Managing serverless function timeouts with efficient chunking
+- Optimizing for Vercel's free tier bandwidth and build limitations
+- Implementing fallback strategies for edge cases
+
+## GitHub Authentication Flow
+The application now uses a more robust GitHub authentication flow:
+1. User authenticates with GitHub using NextAuth.js OAuth
+2. User ID is consistently set to GitHub provider ID (not UUID)
+3. GitHub account information is stored in the accounts table
+4. Access tokens are properly saved for GitHub API calls
+5. Account diagnostics detect and repair broken connections
+
+## Repository Connection System
+The repository connection system now includes:
+- Improved error handling with specific error messages
+- User-friendly diagnostic tools to identify issues
+- Single-click repair for broken GitHub connections
+- Case-insensitive repository name matching
+- Force-add option for repositories that appear to be duplicates
+
+## Known Issues
+- Two user records may exist for the same GitHub user (one with UUID, one with GitHub ID)
+- Repositories may be associated with the UUID user ID instead of GitHub ID
 - Fix repositories page can update repository user associations 

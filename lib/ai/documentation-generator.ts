@@ -258,7 +258,7 @@ export const createDocumentationGraph = async (requestData: {
         // Simulated code fetching - in a real implementation, we'd use the GitHub API
         for (const path of state.filePaths) {
           // This would be replaced with actual GitHub API calls
-          codeContent[path] = `// Placeholder for ${path} content`;
+          codeContent[path] = await fetchFileContent(path, state.owner, state.repo, state.branch);
         }
 
         return {
@@ -562,6 +562,12 @@ export async function startDocumentationGeneration(
   
   // Trigger the webhook to start the documentation process
   try {
+    // Initialize the repository file list if not provided
+    let filePaths = request.filePaths;
+    
+    // If no specific file paths are provided, we'll discover them in the webhook
+    const fileCount = filePaths.length;
+    
     // Use `fetch` with minimal payload just to trigger the webhook
     await fetch(webhookUrl.toString(), {
       method: "POST",
@@ -570,7 +576,13 @@ export async function startDocumentationGeneration(
       },
       body: JSON.stringify({
         documentationId: request.documentationId,
-        trigger: "start"
+        trigger: "start",
+        owner: request.owner,
+        repo: request.repo,
+        branch: request.branch,
+        fileCount: fileCount,
+        // Only send file paths if under a reasonable size limit to avoid large payloads
+        filePaths: fileCount < 50 ? filePaths : [] 
       }),
     });
     
@@ -580,100 +592,369 @@ export async function startDocumentationGeneration(
     
     // Update the database with error status
     const { db } = await import("@/lib/supabase/db");
-    await db
-      .update({
+    const { eq } = await import("drizzle-orm");
+    const { documentationRequests } = await import("@/lib/supabase/schema");
+    
+    await db.update(documentationRequests)
+      .set({
         status: "failed",
         result: JSON.stringify({ error: `Failed to start: ${(error as Error).message}` }),
       })
-      .where({ id: request.documentationId })
-      .into("documentation_requests");
+      .where(eq(documentationRequests.id, request.documentationId));
       
     throw error;
   }
 }
 
-// New function: Process documentation in chunks
+// Process documentation in chunks with enhanced memory management
 export async function processDocumentationChunk(
   documentationId: string,
   chunkIndex: number,
   totalChunks: number,
   partialRequest: Partial<DocRequest>
 ): Promise<Partial<DocResult>> {
+  // Memory management - start with garbage collection to free memory
+  if (global.gc) {
+    try {
+      global.gc();
+    } catch (e) {
+      // Ignore if not available
+    }
+  }
+  
   try {
-    // Define chunk boundaries and process based on the chunk index
-    // Each chunk will handle a different part of the documentation process
-    
-    // Update the processing status
+    // Get the documentation request from the database
     const { db } = await import("@/lib/supabase/db");
-    await db
-      .update({
-        status: "processing",
-        progress: Math.floor((chunkIndex / totalChunks) * 100),
-      })
-      .where({ id: documentationId })
-      .into("documentation_requests");
+    const { eq } = await import("drizzle-orm");
+    const { documentationRequests } = await import("@/lib/supabase/schema");
     
-    // Different processing for different chunk types
+    const docRequest = await db.select()
+      .from(documentationRequests)
+      .where(eq(documentationRequests.id, documentationId))
+      .limit(1)
+      .then(res => res[0]);
+    
+    if (!docRequest) {
+      throw new Error(`Documentation request ${documentationId} not found`);
+    }
+    
+    // Initialize result object with existing data if available
     let result: Partial<DocResult> = {};
-    
-    switch(chunkIndex) {
-      case 0:
-        // First chunk: Initialize and fetch code
-        console.log(`Processing documentation chunk ${chunkIndex}/${totalChunks} for ${documentationId}`);
-        // Partial initialization logic here
-        result = { repositoryId: partialRequest.repositoryId };
-        break;
-        
-      case 1:
-        // Second chunk: Parse and analyze code
-        console.log(`Processing documentation chunk ${chunkIndex}/${totalChunks} for ${documentationId}`);
-        // Code analysis logic would go here
-        break;
-        
-      case 2:
-        // Third chunk: Generate documentation
-        console.log(`Processing documentation chunk ${chunkIndex}/${totalChunks} for ${documentationId}`);
-        // Documentation generation logic would go here
-        break;
-        
-      case 3:
-        // Fourth chunk: Quality assessment and diagrams
-        console.log(`Processing documentation chunk ${chunkIndex}/${totalChunks} for ${documentationId}`);
-        // Quality check and diagram generation would go here
-        break;
-        
-      default:
-        throw new Error(`Invalid chunk index: ${chunkIndex}`);
+    if (docRequest.result) {
+      try {
+        result = JSON.parse(docRequest.result as string);
+      } catch (e) {
+        // If parsing fails, start with empty result
+        result = {};
+      }
     }
     
-    // If this is the last chunk, update as completed
-    if (chunkIndex === totalChunks - 1) {
-      await db
-        .update({
-          status: "completed",
-          progress: 100,
-          completed_at: new Date().toISOString(),
-        })
-        .where({ id: documentationId })
-        .into("documentation_requests");
+    // Define chunk responsibilities based on chunk index
+    // This allows us to split the work into distinct phases
+    let chunkResult: Partial<DocResult> = {};
+    
+    if (totalChunks <= 2) {
+      // For small repositories, do all processing in one or two chunks
+      if (chunkIndex === 0) {
+        // Chunk 0: Fetch code, analyze structure, and generate documentation
+        chunkResult = await processFullDocumentation(partialRequest.filePaths || []);
+      } else {
+        // Chunk 1: Quality assessment and diagrams
+        chunkResult = await processQualityAndDiagrams(result);
+      }
+    } else {
+      // For larger repositories, split into more granular phases
+      const phase = Math.floor(chunkIndex * 4 / totalChunks);
+      
+      switch (phase) {
+        case 0:
+          // Phase 0: Code fetching and parsing
+          chunkResult = await processFetchAndParse(
+            partialRequest.filePaths || [], 
+            chunkIndex, 
+            totalChunks
+          );
+          break;
+          
+        case 1:
+          // Phase 1: Code analysis
+          chunkResult = await processCodeAnalysis(result);
+          break;
+          
+        case 2:
+          // Phase 2: Documentation generation
+          chunkResult = await processDocGeneration(result);
+          break;
+          
+        case 3:
+          // Phase 3: Quality assessment and diagrams
+          chunkResult = await processQualityAndDiagrams(result);
+          break;
+          
+        default:
+          throw new Error(`Unknown phase for chunk ${chunkIndex}`);
+      }
     }
     
-    return result;
+    // Merge the chunk result with the existing result
+    const updatedResult = { ...result, ...chunkResult };
+    
+    // Update the database with the progress and results
+    await db.update(documentationRequests)
+      .set({
+        status: chunkIndex === totalChunks - 1 ? "completed" : "processing",
+        progress: Math.floor(((chunkIndex + 1) / totalChunks) * 100),
+        result: JSON.stringify(updatedResult),
+        completed_at: chunkIndex === totalChunks - 1 ? new Date().toISOString() : undefined,
+      })
+      .where(eq(documentationRequests.id, documentationId));
+    
+    return updatedResult;
   } catch (error) {
-    console.error(`Error processing documentation chunk ${chunkIndex}: ${(error as Error).message}`);
+    console.error(`Error processing chunk ${chunkIndex}:`, error);
     
     // Update the database with error status
     const { db } = await import("@/lib/supabase/db");
-    await db
-      .update({
+    const { eq } = await import("drizzle-orm");
+    const { documentationRequests } = await import("@/lib/supabase/schema");
+    
+    await db.update(documentationRequests)
+      .set({
         status: "failed",
-        result: JSON.stringify({ error: `Failed at chunk ${chunkIndex}: ${(error as Error).message}` }),
+        result: JSON.stringify({ error: `Failed on chunk ${chunkIndex}: ${(error as Error).message}` }),
       })
-      .where({ id: documentationId })
-      .into("documentation_requests");
-      
+      .where(eq(documentationRequests.id, documentationId));
+    
     throw error;
   }
+}
+
+// Helper functions for processing chunks
+
+// Process codebase in one go (for small repos)
+async function processFullDocumentation(filePaths: string[]): Promise<Partial<DocResult>> {
+  // Implementation would go here
+  // This is a simplified version just for demonstration
+  return {
+    documentation: {
+      overview: "Generated overview",
+      components: [],
+      architecture: "Generated architecture",
+      usageGuide: "Generated usage guide",
+    }
+  };
+}
+
+// Process quality assessment and diagrams
+async function processQualityAndDiagrams(currentResult: Partial<DocResult>): Promise<Partial<DocResult>> {
+  // Implementation would go here
+  return {
+    qualityAssessment: {
+      score: 0.75,
+      coverage: 0.8,
+      clarity: 0.7,
+      completeness: 0.75,
+      consistency: 0.8,
+      improvements: []
+    },
+    diagrams: []
+  };
+}
+
+// Process code fetching and parsing
+async function processFetchAndParse(
+  filePaths: string[],
+  chunkIndex: number, 
+  totalChunks: number
+): Promise<Partial<DocResult>> {
+  try {
+    const result: Partial<DocResult> = {
+      files: {},
+      components: [],
+      metadata: {
+        filesProcessed: filePaths.length,
+        processingTime: 0,
+      }
+    };
+    
+    const startTime = Date.now();
+    
+    // If we have no files to process, return early
+    if (!filePaths.length) {
+      return result;
+    }
+    
+    // We'll store all the file contents here
+    const fileContents: Record<string, string> = {};
+    
+    // Batch fetch files in groups of 10 to avoid rate limiting and memory issues
+    const BATCH_SIZE = 10;
+    const batches = Math.ceil(filePaths.length / BATCH_SIZE);
+    
+    for (let i = 0; i < batches; i++) {
+      const batchStart = i * BATCH_SIZE;
+      const batchEnd = Math.min(batchStart + BATCH_SIZE, filePaths.length);
+      const batchPaths = filePaths.slice(batchStart, batchEnd);
+      
+      // Fetch files in parallel within a batch
+      const fetchPromises = batchPaths.map(async (path) => {
+        try {
+          const fileContent = await fetchFileContent(path);
+          return { path, content: fileContent };
+        } catch (error) {
+          console.error(`Error fetching ${path}:`, error);
+          return { path, content: `// Error fetching file: ${(error as Error).message}` };
+        }
+      });
+      
+      const batchResults = await Promise.all(fetchPromises);
+      
+      // Add batch results to our file contents
+      batchResults.forEach(({ path, content }) => {
+        fileContents[path] = content;
+      });
+      
+      // Small pause between batches to avoid overloading memory or hitting rate limits
+      if (i < batches - 1) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    // Add file contents to result
+    result.files = fileContents;
+    
+    // Identify components for further analysis
+    const detectedComponents = identifyComponents(fileContents);
+    if (detectedComponents.length) {
+      result.components = detectedComponents;
+    }
+    
+    // Update metadata
+    result.metadata = {
+      filesProcessed: filePaths.length,
+      processingTime: Date.now() - startTime,
+      fileTypes: countFileTypes(filePaths),
+    };
+    
+    return result;
+  } catch (error) {
+    console.error("Error in processFetchAndParse:", error);
+    return {
+      error: `Failed to fetch and parse code: ${(error as Error).message}`,
+      metadata: {
+        filesProcessed: 0,
+        processingTime: 0
+      }
+    };
+  }
+}
+
+// Helper function to fetch file content from GitHub
+async function fetchFileContent(filePath: string, owner?: string, repo?: string, branch?: string): Promise<string> {
+  try {
+    // If no owner/repo/branch provided, we can't fetch from GitHub API
+    if (!owner || !repo || !branch) {
+      return `// Mock content for ${filePath} (no repo info provided)`;
+    }
+    
+    // Encode the file path for the GitHub API
+    const encodedPath = encodeURIComponent(filePath);
+    
+    // Create the URL for the GitHub API
+    const url = `https://api.github.com/repos/${owner}/${repo}/contents/${encodedPath}?ref=${branch}`;
+    
+    // Fetch the file content
+    const response = await fetch(url, {
+      headers: {
+        Authorization: process.env.GITHUB_TOKEN ? `token ${process.env.GITHUB_TOKEN}` : '',
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "CodeReview",
+      },
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`GitHub API error: ${response.status} - ${errorText}`);
+    }
+    
+    const data = await response.json();
+    
+    // GitHub API returns content as base64 encoded
+    if (data.content && data.encoding === "base64") {
+      // Decode the base64 content
+      return Buffer.from(data.content, 'base64').toString('utf-8');
+    }
+    
+    // If no content was found
+    return `// Empty file or unable to retrieve content for ${filePath}`;
+  } catch (error) {
+    console.error(`Error fetching file content from GitHub: ${(error as Error).message}`);
+    return `// Error: Failed to fetch file content: ${(error as Error).message}`;
+  }
+}
+
+// Helper function to identify components in code files
+function identifyComponents(files: Record<string, string>): any[] {
+  // This is a simplified implementation
+  const components: any[] = [];
+  
+  // Look for React components (in .tsx, .jsx files)
+  Object.entries(files).forEach(([path, content]) => {
+    if (path.endsWith('.tsx') || path.endsWith('.jsx')) {
+      // Simple regex to detect component declarations
+      // A more sophisticated implementation would use AST parsing
+      const componentMatches = content.match(/function\s+([A-Z][a-zA-Z0-9]*)\s*\(/g);
+      const classMatches = content.match(/class\s+([A-Z][a-zA-Z0-9]*)\s+extends\s+React\.Component/g);
+      const arrowMatches = content.match(/const\s+([A-Z][a-zA-Z0-9]*)\s*=\s*(\([^)]*\)|)\s*=>/g);
+      
+      if (componentMatches || classMatches || arrowMatches) {
+        components.push({
+          type: 'component',
+          path: path,
+          name: extractComponentName(path),
+        });
+      }
+    }
+  });
+  
+  return components;
+}
+
+// Helper function to extract component name from file path
+function extractComponentName(filePath: string): string {
+  const fileName = filePath.split('/').pop() || '';
+  return fileName.replace(/\.(tsx|jsx|js|ts)$/, '');
+}
+
+// Helper function to count file types
+function countFileTypes(filePaths: string[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  
+  filePaths.forEach(path => {
+    const extension = path.split('.').pop() || 'unknown';
+    counts[extension] = (counts[extension] || 0) + 1;
+  });
+  
+  return counts;
+}
+
+// Process code analysis
+async function processCodeAnalysis(currentResult: Partial<DocResult>): Promise<Partial<DocResult>> {
+  // Implementation would go here
+  return {};
+}
+
+// Process documentation generation
+async function processDocGeneration(currentResult: Partial<DocResult>): Promise<Partial<DocResult>> {
+  // Implementation would go here
+  return {
+    documentation: {
+      overview: "Generated overview",
+      components: [],
+      architecture: "Generated architecture",
+      usageGuide: "Generated usage guide",
+    }
+  };
 }
 
 /**
