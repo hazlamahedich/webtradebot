@@ -1,7 +1,8 @@
 import { StructuredOutputParser } from "@langchain/core/output_parsers";
 import { RunnableSequence } from "@langchain/core/runnables";
-import { StateGraph } from "langchain/graphs";
-import { defineState } from "langchain/graphs";
+import { StateGraph } from "@langchain/langgraph";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import { codeAnalysisModel } from "./models";
 import { documentationPrompts } from "./documentation-prompts";
@@ -16,22 +17,112 @@ import {
   QualityAssessment
 } from "./types";
 
-// Define workflow state for documentation generation
-const DocumentationState = defineState({
-  repositoryId: "string",
-  owner: "string",
-  repo: "string",
-  branch: "string",
-  filePaths: "array",
-  codeContent: "array",
-  parsedComponents: "object",
-  codeAnalysis: "object",
-  documentation: "object",
-  qualityAssessment: "object",
-  missingDocs: "array",
-  diagrams: "array",
-  error: "string?",
-});
+// Define types for documentation generation
+interface DocumentationState {
+  filePaths: string[];
+  codeContent: Record<string, string>;
+  parsedComponents: ParsedComponent[];
+  codeAnalysis: CodeAnalysis | null;
+  documentation: Documentation | null;
+}
+
+interface ParsedComponent {
+  name: string;
+  type: string;
+  props: Prop[];
+  description: string;
+  filePath: string;
+  code: string;
+}
+
+interface Prop {
+  name: string;
+  type: string;
+  required: boolean;
+  description: string;
+  defaultValue?: string;
+}
+
+interface CodeAnalysis {
+  components: ComponentAnalysis[];
+  utils: UtilityFunction[];
+  hooks: CustomHook[];
+}
+
+interface ComponentAnalysis {
+  name: string;
+  purpose: string;
+  dependencies: string[];
+  usagePattern: string;
+  complexity: "simple" | "moderate" | "complex";
+}
+
+interface UtilityFunction {
+  name: string;
+  purpose: string;
+  parameters: string[];
+  returnType: string;
+  usage: string;
+}
+
+interface CustomHook {
+  name: string;
+  purpose: string;
+  parameters: string[];
+  returnValue: string;
+  usage: string;
+}
+
+interface Documentation {
+  overview: string;
+  components: ComponentDoc[];
+  utils: UtilDoc[];
+  hooks: HookDoc[];
+  examples: Example[];
+}
+
+interface ComponentDoc {
+  name: string;
+  description: string;
+  props: PropDoc[];
+  examples: string[];
+}
+
+interface PropDoc {
+  name: string;
+  type: string;
+  description: string;
+  required: boolean;
+  defaultValue?: string;
+}
+
+interface UtilDoc {
+  name: string;
+  description: string;
+  parameters: ParameterDoc[];
+  returnType: string;
+  examples: string[];
+}
+
+interface HookDoc {
+  name: string;
+  description: string;
+  parameters: ParameterDoc[];
+  returnValue: string;
+  examples: string[];
+}
+
+interface ParameterDoc {
+  name: string;
+  type: string;
+  description: string;
+}
+
+interface Example {
+  title: string;
+  code: string;
+  description: string;
+}
 
 // Zod schemas for structured output parsing
 const CodeComponentSchema = z.object({
@@ -126,8 +217,14 @@ export const createDocumentationGraph = async (requestData: {
   filePaths: string[];
 }) => {
   // Initialize the state graph
-  const graph = new StateGraph({
-    channels: DocumentationState,
+  const graph = new StateGraph<DocumentationState>({
+    channels: {
+      filePaths: { value: (x) => x },
+      codeContent: { value: (x) => x },
+      parsedComponents: { value: (x) => x },
+      codeAnalysis: { value: (x) => x },
+      documentation: { value: (x) => x }
+    }
   });
 
   // Initialize state
@@ -139,10 +236,10 @@ export const createDocumentationGraph = async (requestData: {
         repo: requestData.repo,
         branch: requestData.branch,
         filePaths: requestData.filePaths,
-        codeContent: [],
-        parsedComponents: { components: [] },
-        codeAnalysis: { components: [], relationships: [], patterns: [], architecture: { layers: [], modules: [], description: "" } },
-        documentation: { overview: "", components: [], architecture: "", usageGuide: "", setup: "" },
+        codeContent: {},
+        parsedComponents: [],
+        codeAnalysis: null,
+        documentation: null,
         qualityAssessment: { score: 0, coverage: 0, clarity: 0, completeness: 0, consistency: 0, improvements: [] },
         missingDocs: [],
         diagrams: [],
@@ -156,15 +253,12 @@ export const createDocumentationGraph = async (requestData: {
       try {
         // Here we'd use GitHub API to fetch code content
         // For now, this is a placeholder
-        const codeContent: { path: string; content: string }[] = [];
+        const codeContent: Record<string, string> = {};
         
         // Simulated code fetching - in a real implementation, we'd use the GitHub API
         for (const path of state.filePaths) {
           // This would be replaced with actual GitHub API calls
-          codeContent.push({
-            path,
-            content: `// Placeholder for ${path} content`,
-          });
+          codeContent[path] = `// Placeholder for ${path} content`;
         }
 
         return {
@@ -189,18 +283,18 @@ export const createDocumentationGraph = async (requestData: {
         
         // Use language-specific parsers based on file extensions
         // This would be a more sophisticated implementation in production
-        const parsedComponents = {
-          components: codeContent.map((file, index) => ({
-            type: "module" as const,
-            name: file.path.split("/").pop() || "",
-            location: {
-              filePath: file.path,
-              startLine: 1,
-              endLine: file.content.split("\n").length,
-            },
-            existingDocs: "",
-          })),
-        };
+        const parsedComponents: ParsedComponent[] = [];
+        
+        for (const path in codeContent) {
+          parsedComponents.push({
+            name: path.split("/").pop() || "",
+            type: "module",
+            props: [],
+            description: "",
+            filePath: path,
+            code: codeContent[path],
+          });
+        }
 
         return {
           ...state,
@@ -223,9 +317,7 @@ export const createDocumentationGraph = async (requestData: {
         const { codeContent, parsedComponents } = state;
         
         // Create a prompt for the LLM to analyze the code structure
-        const codeString = codeContent
-          .map((file) => `File: ${file.path}\n\n${file.content}`)
-          .join("\n\n");
+        const codeString = Object.values(codeContent).join("\n\n");
         
         // Use the code analysis prompt with the LLM
         const analysisChain = RunnableSequence.from([
@@ -236,7 +328,7 @@ export const createDocumentationGraph = async (requestData: {
 
         const analysis = await analysisChain.invoke({
           code: codeString,
-          components: JSON.stringify(parsedComponents.components),
+          components: JSON.stringify(parsedComponents),
         });
 
         return {
@@ -267,7 +359,7 @@ export const createDocumentationGraph = async (requestData: {
         ]);
 
         const documentation = await documentationChain.invoke({
-          code: codeContent.map((file) => `File: ${file.path}\n\n${file.content}`).join("\n\n"),
+          code: Object.values(codeContent).join("\n\n"),
           analysis: JSON.stringify(codeAnalysis),
         });
 

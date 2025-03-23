@@ -1,6 +1,9 @@
-import { defineState, StateGraph } from "langchain/graphs";
 import { RunnableSequence } from "@langchain/core/runnables";
-import { StructuredOutputParser } from "langchain/output_parsers";
+import { StateGraph } from "@langchain/langgraph";
+import { StructuredOutputParser } from "@langchain/core/output_parsers";
+import { z } from "zod";
+import { db } from "@/lib/supabase/db";
+import { ChatOpenAI } from "@langchain/openai";
 import { 
   codeAnalysisModel, 
   improvementSuggestionModel, 
@@ -23,24 +26,153 @@ import {
   PullRequestDetails,
   CodeChange
 } from "./types";
-import { db, supabase } from "@/lib/supabase/db";
 import { reviews } from "@/lib/supabase/schema";
 import { reviewStatusEnum } from "@/lib/supabase/schema";
 
-// Define workflow state
-const CodeReviewState = defineState({
-  reviewId: "string",
-  owner: "string",
-  repo: "string", 
-  pullNumber: "number",
-  pullRequest: "object",
-  codeChanges: "array",
-  analysis: "object",
-  suggestions: "array",
-  explanation: "object",
-  summary: "object",
-  error: "string?",
-});
+// Define the types for our workflow states
+interface CodeReviewState {
+  owner: string;
+  repo: string;
+  pullNumber: number;
+  pullRequest: {
+    title: string;
+    description: string;
+    base: string;
+    head: string;
+  };
+  codeChanges: CodeChange[];
+  analysis: CodeReviewAnalysis | null;
+  result: CodeReviewResult | null;
+}
+
+// Define the types for code changes
+interface CodeChange {
+  filename: string;
+  patch: string;
+  // Add other properties as needed
+}
+
+// Define the types for code review analysis
+interface CodeReviewAnalysis {
+  // Define the structure of the analysis here
+  issues: CodeIssue[];
+}
+
+interface CodeIssue {
+  file: string;
+  line?: number;
+  severity: "critical" | "major" | "minor" | "suggestion";
+  description: string;
+  suggestion?: string;
+}
+
+// Define the types for the final review result
+interface CodeReviewResult {
+  summary: string;
+  issues: CodeIssue[];
+}
+
+// Create processing flow
+export async function createCodeReviewGraph() {
+  // Model definition
+  const model = new ChatOpenAI({
+    modelName: "gpt-4-turbo-preview",
+    temperature: 0,
+  });
+
+  // Analyze the code changes
+  const analyzeCode = async (state: CodeReviewState) => {
+    console.log("Analyzing code...");
+    const { codeChanges, pullRequest } = state;
+    
+    // Implementation details for code analysis
+    // For now, this is just a placeholder
+    
+    return {
+      issues: []
+    };
+  };
+
+  // Generate the final review from the analysis
+  const generateFinalReview = async (state: CodeReviewState) => {
+    console.log("Generating final review...");
+    const { analysis, pullRequest } = state;
+    
+    // Implementation details for generating the final review
+    // For now, this is just a placeholder
+    
+    return {
+      summary: "Code review completed",
+      issues: analysis?.issues || []
+    };
+  };
+
+  // Create the workflow
+  const workflow = new StateGraph<CodeReviewState>({
+    channels: {
+      owner: { value: (x) => x },
+      repo: { value: (x) => x },
+      pullNumber: { value: (x) => x },
+      pullRequest: { value: (x) => x },
+      codeChanges: { value: (x) => x },
+      analysis: { value: (x) => x },
+      result: { value: (x) => x }
+    }
+  });
+
+  // Add nodes to our workflow
+  workflow.addNode("analyze_code", analyzeCode);
+  workflow.addNode("generate_final_review", generateFinalReview);
+
+  // Set up the edges for flow control
+  workflow.addEdge("analyze_code", "generate_final_review");
+  workflow.setEntryPoint("analyze_code");
+
+  // Compile the workflow
+  const compiledWorkflow = workflow.compile();
+  
+  return compiledWorkflow;
+}
+
+// Interface for executing a code review
+export async function executeCodeReview(owner: string, repo: string, pr_number: number, pr_title: string, pr_description: string, code_diff: string) {
+  try {
+    // Parse the code diff into code changes
+    const codeChanges = parseCodeDiff(code_diff);
+    
+    // Set up the initial state
+    const initialState: CodeReviewState = {
+      owner,
+      repo,
+      pullNumber: pr_number,
+      pullRequest: {
+        title: pr_title,
+        description: pr_description,
+        base: "",
+        head: ""
+      },
+      codeChanges,
+      analysis: null,
+      result: null
+    };
+    
+    // Create and run the workflow
+    const workflow = await createCodeReviewGraph();
+    const result = await workflow.invoke(initialState);
+    
+    return result;
+  } catch (error) {
+    console.error("Error in code review:", error);
+    throw error;
+  }
+}
+
+// Helper function to parse code diff
+function parseCodeDiff(codeDiff: string): CodeChange[] {
+  // Implementation details for parsing the code diff
+  // For now, return an empty array
+  return [];
+}
 
 // Create LangGraph for code review
 const createCodeReviewGraph = async (requestData: CodeReviewRequest) => {
@@ -72,10 +204,7 @@ const createCodeReviewGraph = async (requestData: CodeReviewRequest) => {
         pullRequest: null,
         codeChanges: [],
         analysis: null,
-        suggestions: [],
-        explanation: null,
-        summary: null,
-        error: null,
+        result: null,
       };
     },
   });
@@ -412,8 +541,6 @@ export async function startCodeReviewFlow(requestData: CodeReviewRequest) {
 }
 
 // Zod schemas for structured output parsing
-import { z } from "zod";
-
 const CodeAnalysisResultSchema = z.object({
   bugs: z.array(z.object({
     description: z.string(),

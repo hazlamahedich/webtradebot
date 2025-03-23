@@ -1,10 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Enable SWC compiler explicitly
+  swcMinify: true,
   // Disable edge runtime for middleware to avoid PostgreSQL connection issues
   experimental: {
     // Ensure middleware uses Node.js runtime
-    instrumentationHook: true
+    instrumentationHook: true,
+    // Force SWC for font handling even with Babel config
+    forceSwcTransforms: true
   },
   // Skip middleware url normalization
   skipMiddlewareUrlNormalize: true,
@@ -21,6 +25,17 @@ const nextConfig = {
         ],
       },
     ];
+  },
+  webpack: (config) => {
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      net: false,
+      tls: false,
+      crypto: false,
+      stream: false,
+      'perf_hooks': false,
+    };
+    return config;
   },
 };
 

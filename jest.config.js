@@ -7,7 +7,7 @@ module.exports = {
   },
   testMatch: ['**/__tests__/**/*.test.[jt]s?(x)'],
   transform: {
-    '^.+\\.(ts|tsx|js|jsx)$': ['babel-jest', { configFile: './babel.config.jest.js' }]
+    '^.+\\.(ts|tsx|js|jsx)$': ['babel-jest', { configFile: './.babel.config.jest.js' }]
   },
   transformIgnorePatterns: [
     '/node_modules/',
