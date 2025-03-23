@@ -1,14 +1,13 @@
+"use client";
+
 import React from "react";
-import { redirect } from "next/navigation";
 import Link from "next/link";
 
-export default async function DashboardLayout({
+export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Note: We'd add proper authentication here in a complete implementation
-
   return (
     <div className="flex min-h-screen">
       <div className="w-64 bg-slate-100 dark:bg-slate-800 border-r h-screen flex flex-col">

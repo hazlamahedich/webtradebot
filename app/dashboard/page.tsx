@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { GitHubLogoIcon, ExternalLinkIcon } from "@radix-ui/react-icons";
 import { formatDistanceToNow } from "date-fns";
+import { StatCard } from "./components/stat-card";
 
 // Set Node.js runtime for this page
 export const runtime = 'nodejs';
@@ -205,38 +206,6 @@ export default async function DashboardPage() {
       </div>
     </div>
   );
-}
-
-function StatCard({ 
-  title, 
-  value, 
-  description, 
-  href 
-}: { 
-  title: string; 
-  value: string; 
-  description: string;
-  href?: string;
-}) {
-  const content = (
-    <Card className={href ? "hover:bg-accent/10 transition-colors" : ""}>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base font-medium text-muted-foreground">
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="text-3xl font-bold">{value}</div>
-        <p className="text-sm text-muted-foreground mt-1">{description}</p>
-      </CardContent>
-    </Card>
-  );
-  
-  if (href) {
-    return <Link href={href}>{content}</Link>;
-  }
-  
-  return content;
 }
 
 async function getStats(userId: string) {
