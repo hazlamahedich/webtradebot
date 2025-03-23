@@ -5,16 +5,30 @@ import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Github } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 
 export default function SignIn() {
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
 
   const handleSignIn = async () => {
     setIsLoading(true);
+    setError(null);
+    
     try {
-      await signIn("github", { callbackUrl: "/dashboard" });
-    } catch (error) {
-      console.error("Authentication error:", error);
+      const result = await signIn("github", { 
+        callbackUrl,
+        redirect: true
+      });
+      
+      if (!result?.ok) {
+        setError("Authentication failed. Please try again.");
+      }
+    } catch (err) {
+      console.error("Authentication error:", err);
+      setError("An error occurred during authentication.");
     } finally {
       setIsLoading(false);
     }
@@ -30,6 +44,11 @@ export default function SignIn() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md border border-red-200">
+              {error}
+            </div>
+          )}
           <Button
             className="w-full"
             size="lg"

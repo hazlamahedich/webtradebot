@@ -1,3 +1,4 @@
-import { GET, POST } from "@/lib/auth";
+import { handlers } from "@/lib/auth";
 
-export { GET, POST }; 
+// Export the Next.js API route handlers from NextAuth
+export const { GET, POST } = handlers; 

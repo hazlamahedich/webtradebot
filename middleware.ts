@@ -6,9 +6,10 @@ export async function middleware(request: NextRequest) {
   
   // Protected routes - require authentication
   if (!session && request.nextUrl.pathname.startsWith("/dashboard")) {
-    const url = new URL("/auth/signin", request.url);
-    url.searchParams.set("callbackUrl", request.nextUrl.pathname);
-    return NextResponse.redirect(url);
+    // Store the original URL as a search param to redirect back after login
+    const redirectUrl = new URL("/auth/signin", request.url);
+    redirectUrl.searchParams.set("callbackUrl", request.nextUrl.pathname);
+    return NextResponse.redirect(redirectUrl);
   }
 
   return NextResponse.next();
