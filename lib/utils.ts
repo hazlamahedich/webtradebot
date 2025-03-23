@@ -93,8 +93,8 @@ export function humanizeString(str: string): string {
  */
 export function getRelativeTime(date: Date | string): string {
   const now = new Date();
-  const past = typeof date === 'string' ? new Date(date) : date;
-  const diffInSeconds = Math.floor((now.getTime() - past.getTime()) / 1000);
+  const then = new Date(date);
+  const diffInSeconds = Math.floor((now.getTime() - then.getTime()) / 1000);
   
   if (diffInSeconds < 60) {
     return 'just now';
@@ -122,4 +122,22 @@ export function getRelativeTime(date: Date | string): string {
   
   const diffInYears = Math.floor(diffInMonths / 12);
   return `${diffInYears} year${diffInYears !== 1 ? 's' : ''} ago`;
+}
+
+/**
+ * Generates a unique ID string
+ * @returns A unique identifier string
+ */
+export function generateUniqueId(): string {
+  // Use crypto.randomUUID() if available (Node.js environment)
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  
+  // Fallback for older environments
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
 } 

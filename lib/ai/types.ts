@@ -105,6 +105,8 @@ export interface MissingDocumentation {
 
 export interface DocumentationDiagram {
   type: string;
+  title: string;
+  description: string;
   content: string;
 }
 

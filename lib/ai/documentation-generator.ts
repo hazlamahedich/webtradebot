@@ -357,31 +357,22 @@ export const createDocumentationGraph = async (requestData: {
       try {
         const { codeAnalysis } = state;
         
-        // In a real implementation, we would use tools like Mermaid.js or PlantUML
-        // to generate diagrams based on code relationships
-        
-        // For now, we'll just create placeholder text representations
-        const classDiagram = `
-          classDiagram
-          class Example {
-            +String data
-            +method()
-          }
-        `;
-        
-        const componentDiagram = `
-          graph TD
-          A[Component A] --> B[Component B]
-          A --> C[Component C]
-          B --> D[Component D]
-          C --> D
-        `;
-        
-        const diagrams = [
-          { type: "class", content: classDiagram },
-          { type: "component", content: componentDiagram },
-        ];
+        // Use the diagram generation prompt with the LLM
+        const diagramChain = RunnableSequence.from([
+          documentationPrompts.diagramGenerationPrompt,
+          codeAnalysisModel,
+          StructuredOutputParser.fromZodSchema(z.array(z.object({
+            type: z.string(),
+            title: z.string(),
+            description: z.string(),
+            content: z.string(),
+          }))),
+        ]);
 
+        const diagrams = await diagramChain.invoke({
+          analysis: JSON.stringify(codeAnalysis),
+        });
+        
         return {
           ...state,
           diagrams,
@@ -391,6 +382,8 @@ export const createDocumentationGraph = async (requestData: {
         return {
           ...state,
           error: `Failed to generate diagrams: ${(error as Error).message}`,
+          // Provide empty array to avoid null pointer issues
+          diagrams: [],
         };
       }
     },
@@ -589,4 +582,186 @@ export async function processDocumentationChunk(
       
     throw error;
   }
+}
+
+/**
+ * Exports documentation in various formats
+ * @param documentationId The ID of the documentation to export
+ * @param format The format to export to (markdown, html, pdf, json)
+ * @returns The exported documentation as a string or Buffer
+ */
+export async function exportDocumentation(
+  documentationId: string, 
+  format: 'markdown' | 'html' | 'pdf' | 'json'
+): Promise<string | Buffer> {
+  try {
+    // Fetch the documentation from the database
+    const { db } = await import("@/lib/supabase/db");
+    const docResult = await db
+      .select('*')
+      .from('documentation_requests')
+      .where({ id: documentationId })
+      .single();
+    
+    if (!docResult) {
+      throw new Error(`Documentation not found: ${documentationId}`);
+    }
+    
+    const result = JSON.parse(docResult.result || '{}') as DocResult;
+    const { documentation, diagrams, qualityAssessment } = result;
+    
+    switch (format) {
+      case 'json':
+        return JSON.stringify(result, null, 2);
+        
+      case 'markdown':
+        return generateMarkdownDocumentation(documentation, diagrams);
+        
+      case 'html':
+        const markdown = generateMarkdownDocumentation(documentation, diagrams);
+        return convertMarkdownToHtml(markdown);
+        
+      case 'pdf':
+        const html = convertMarkdownToHtml(
+          generateMarkdownDocumentation(documentation, diagrams)
+        );
+        return await generatePdfFromHtml(html);
+        
+      default:
+        throw new Error(`Unsupported format: ${format}`);
+    }
+  } catch (error) {
+    console.error(`Error exporting documentation: ${(error as Error).message}`);
+    throw new Error(`Failed to export documentation: ${(error as Error).message}`);
+  }
+}
+
+/**
+ * Generates markdown documentation from the documentation object
+ */
+function generateMarkdownDocumentation(
+  documentation: Documentation,
+  diagrams: DocumentationDiagram[]
+): string {
+  if (!documentation || !documentation.overview) {
+    return "# Documentation not available";
+  }
+  
+  let markdown = `# ${documentation.overview.split('\n')[0] || 'API Documentation'}\n\n`;
+  
+  // Add overview
+  markdown += `## Overview\n\n${documentation.overview}\n\n`;
+  
+  // Add architecture section
+  if (documentation.architecture) {
+    markdown += `## Architecture\n\n${documentation.architecture}\n\n`;
+  }
+  
+  // Add diagrams if available
+  if (diagrams && diagrams.length > 0) {
+    markdown += `## Diagrams\n\n`;
+    diagrams.forEach((diagram, index) => {
+      markdown += `### ${diagram.type.charAt(0).toUpperCase() + diagram.type.slice(1)} Diagram\n\n`;
+      markdown += "```mermaid\n" + diagram.content + "\n```\n\n";
+    });
+  }
+  
+  // Add components
+  if (documentation.components && documentation.components.length > 0) {
+    markdown += `## Components\n\n`;
+    documentation.components.forEach(component => {
+      markdown += `### ${component.componentId}\n\n`;
+      markdown += `${component.description}\n\n`;
+      
+      // Add usage examples
+      if (component.usage) {
+        markdown += `#### Usage\n\n${component.usage}\n\n`;
+      }
+      
+      // Add parameters if available
+      if (component.parameters && component.parameters.length > 0) {
+        markdown += `#### Parameters\n\n`;
+        markdown += `| Name | Type | Description | Required |\n`;
+        markdown += `| ---- | ---- | ----------- | -------- |\n`;
+        component.parameters.forEach(param => {
+          markdown += `| ${param.name} | ${param.type} | ${param.description} | ${param.required ? 'Yes' : 'No'} |\n`;
+        });
+        markdown += `\n`;
+      }
+      
+      // Add return type if available
+      if (component.returnType) {
+        markdown += `#### Returns\n\n`;
+        markdown += `**Type:** ${component.returnType}\n\n`;
+        if (component.returnDescription) {
+          markdown += `${component.returnDescription}\n\n`;
+        }
+      }
+      
+      // Add examples if available
+      if (component.examples && component.examples.length > 0) {
+        markdown += `#### Examples\n\n`;
+        component.examples.forEach((example, idx) => {
+          markdown += `##### Example ${idx + 1}\n\n`;
+          markdown += "```typescript\n" + example + "\n```\n\n";
+        });
+      }
+    });
+  }
+  
+  // Add usage guide
+  if (documentation.usageGuide) {
+    markdown += `## Usage Guide\n\n${documentation.usageGuide}\n\n`;
+  }
+  
+  // Add setup instructions if available
+  if (documentation.setup) {
+    markdown += `## Setup\n\n${documentation.setup}\n\n`;
+  }
+  
+  return markdown;
+}
+
+/**
+ * Converts markdown to HTML
+ */
+function convertMarkdownToHtml(markdown: string): string {
+  // Use a library like marked or remark to convert markdown to HTML
+  // This is a simplified implementation
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentation</title>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }
+    pre { background: #f4f4f4; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; margin: 20px 0; }
+    th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+    th { background-color: #f4f4f4; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+</head>
+<body>
+  <div id="content"></div>
+  <script>
+    document.getElementById('content').innerHTML = marked.parse(\`${markdown.replace(/`/g, '\\`')}\`);
+    mermaid.initialize({ startOnLoad: true, theme: 'neutral' });
+  </script>
+</body>
+</html>`;
+
+  return html;
+}
+
+/**
+ * Generates a PDF from HTML using a headless browser
+ * Note: In a real implementation, you'd use a library like puppeteer
+ */
+async function generatePdfFromHtml(html: string): Promise<Buffer> {
+  // This would use a library like puppeteer to generate a PDF
+  // For now, we'll return a dummy buffer
+  return Buffer.from('PDF generation would happen here');
 } 
