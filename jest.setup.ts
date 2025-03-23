@@ -1,5 +1,20 @@
-// Import jest-dom matchers
+// Import and configure jest-dom
 import '@testing-library/jest-dom';
+
+// This adds custom matchers like `toBeInTheDocument` to expect
+// This makes TypeScript recognize the custom matchers
+declare global {
+  namespace jest {
+    interface Matchers<R> {
+      toBeInTheDocument(): R;
+      toBeVisible(): R;
+      toBeDisabled(): R;
+      toHaveTextContent(text: string | RegExp): R;
+      toHaveValue(value: string | number | RegExp): R;
+      toHaveStyle(style: Record<string, any>): R;
+    }
+  }
+}
 
 // Mock Next.js router
 jest.mock('next/navigation', () => ({
