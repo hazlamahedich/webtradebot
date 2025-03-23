@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { handlePRWebhook } from "@/lib/ai/pr-documentation-integration";
+import { handlePRReviewEvent } from "@/lib/ai/pr-review-integration";
 import { headers } from "next/headers";
 import crypto from "crypto";
 
@@ -63,7 +64,12 @@ export async function POST(req: NextRequest) {
     if (event === "pull_request") {
       // Process in the background
       // We'll immediately return a 200 response and continue processing
+      
+      // Process documentation integration
       void handlePRWebhook(event, parsedPayload);
+      
+      // Process code review integration
+      void handlePRReviewEvent(event, parsedPayload);
       
       return NextResponse.json({
         message: "Webhook received and processing started",

@@ -14,6 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { formatDistanceToNow } from "date-fns";
+import { Plus } from "lucide-react";
 
 export default async function ReviewsPage() {
   const session = await auth();
@@ -69,9 +70,17 @@ export default async function ReviewsPage() {
     <div className="container py-8">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Code Reviews</h1>
-        <Link href="/dashboard/repositories">
-          <Button variant="outline">Manage Repositories</Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link href="/dashboard/reviews/request">
+            <Button variant="default" className="flex items-center gap-1">
+              <Plus className="h-4 w-4" />
+              Request Review
+            </Button>
+          </Link>
+          <Link href="/dashboard/repositories">
+            <Button variant="outline">Manage Repositories</Button>
+          </Link>
+        </div>
       </div>
       
       <div className="grid gap-4">
@@ -83,6 +92,11 @@ export default async function ReviewsPage() {
                 When you open pull requests in your connected repositories, they'll show up here for AI review.
               </CardDescription>
             </CardHeader>
+            <CardFooter>
+              <Link href="/dashboard/reviews/request">
+                <Button>Request Your First Review</Button>
+              </Link>
+            </CardFooter>
           </Card>
         ) : (
           reviewsData.map(({ review, pr, repo }) => (

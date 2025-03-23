@@ -126,6 +126,8 @@ export const codeReviews = pgTable("code_reviews", {
   status: reviewStatusEnum("status").notNull().default("pending"),
   summary: text("summary"),
   feedback: json("feedback"),
+  result: json("result"),
+  error: text("error"),
   prId: uuid("pr_id")
     .notNull()
     .references(() => pullRequests.id, { onDelete: "cascade" }),
