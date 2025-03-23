@@ -32,6 +32,10 @@ We have completed Phase 4 (Launch) and are now focused on completing Phase 1 (Fo
   - Built advanced search capabilities with semantic matching
   - Created export functionality for multiple document formats
   - Integrated documentation generation with PR workflow via webhooks
+- Fixed GitHub repository connection issues related to missing account records
+- Added diagnostic tools to identify authentication and account problems
+- Created a fix-github-account API endpoint to repair broken connections
+- Enhanced the Connect Repository form with better error handling and diagnostics
 
 ## Next Steps
 1. Create the proper GitHub OAuth configuration
@@ -48,6 +52,10 @@ We have completed Phase 4 (Launch) and are now focused on completing Phase 1 (Fo
    - Advanced review options
    - Enhanced caching strategies
    - Fallback mechanisms for processing failures
+10. Clean up duplicate user records
+11. Ensure consistent user ID usage across the application
+12. Improve GitHub API error handling for repository connections
+13. Add repository synchronization features for connected repositories
 
 ## Active Decisions
 1. Using Next.js App Router for modern React Server Components approach
@@ -71,4 +79,25 @@ We have completed Phase 4 (Launch) and are now focused on completing Phase 1 (Fo
 - Balancing documentation quality with generation speed
 - Managing serverless function timeouts with efficient chunking
 - Optimizing for Vercel's free tier bandwidth and build limitations
-- Implementing fallback strategies for edge cases 
+- Implementing fallback strategies for edge cases
+
+## GitHub Authentication Flow
+The application now uses a more robust GitHub authentication flow:
+1. User authenticates with GitHub using NextAuth.js OAuth
+2. User ID is consistently set to GitHub provider ID (not UUID)
+3. GitHub account information is stored in the accounts table
+4. Access tokens are properly saved for GitHub API calls
+5. Account diagnostics detect and repair broken connections
+
+## Repository Connection System
+The repository connection system now includes:
+- Improved error handling with specific error messages
+- User-friendly diagnostic tools to identify issues
+- Single-click repair for broken GitHub connections
+- Case-insensitive repository name matching
+- Force-add option for repositories that appear to be duplicates
+
+## Known Issues
+- Two user records may exist for the same GitHub user (one with UUID, one with GitHub ID)
+- Repositories may be associated with the UUID user ID instead of GitHub ID
+- Fix repositories page can update repository user associations 

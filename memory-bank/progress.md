@@ -31,6 +31,13 @@
   - Missing documentation detection and suggestions
   - Documentation improvement recommendations
   - Visual quality analysis dashboard
+- GitHub Repository Connection
+  - User authentication with GitHub OAuth
+  - Repository connection using the GitHub API
+  - Repository listing in dashboard
+  - Fix utility for account connection issues
+  - User-friendly error messages and diagnostics
+  - Automatic migration of repositories between user IDs
 
 ## In Progress
 - Setting up NextAuth.js with GitHub OAuth
@@ -95,4 +102,18 @@ We're continuing to focus on completing Phase 1 (Foundation) elements for the co
 - Authentication flow to be completed
 - Chunked processing needs comprehensive testing
 - Edge function cold starts may cause initial latency
-- Need to implement monitoring for background jobs 
+- Need to implement monitoring for background jobs
+
+## Recent Improvements
+- Fixed GitHub account connection issues
+- Added diagnostic tools to identify authentication problems
+- Created fix-github-account API endpoint to repair broken connections
+- Enhanced Connect Repository form with better error handling
+- Implemented consistent user ID usage with GitHub provider ID
+
+## What's Left
+- Cleanup of duplicate user records
+- UI improvements for repository management
+- Webhooks for repository updates
+- Repository synchronization
+- Repository deletion 

@@ -113,4 +113,33 @@
    - unified: ^10.1.2
    - remark-parse: ^10.0.2
    - remark-gfm: ^3.0.1
-   - mermaid: ^10.6.1 
+   - mermaid: ^10.6.1
+
+# GitHub Integration
+
+## Authentication
+- GitHub OAuth integration using NextAuth.js
+- Access token stored in accounts table
+- GitHub user ID used as primary user identifier
+- Session includes GitHub access token for API calls
+- Automatic repository migration for user ID changes
+
+## Repository Connection
+- Repository lookup by full name (username/repository)
+- GitHub API calls secured with user's OAuth token
+- Repository data stored in repositories table with user association
+- Fix endpoints for handling connection issues
+- Case-insensitive repository matching
+
+## Accounts System
+- Two-table architecture: users and accounts
+- users table stores user profile information
+- accounts table stores OAuth provider data including tokens
+- Diagnostic endpoints for checking account status
+- Fix utility to create missing account records
+
+## Common Issues and Solutions
+- Missing account records: Use fix-github-account API endpoint
+- Repository already exists: Option to force-add with confirmation
+- User ID mismatch: Automatic migration of repositories between user IDs
+- Authentication failures: Session diagnostics in debug endpoint 

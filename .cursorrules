@@ -44,4 +44,31 @@
 - Clean, minimal UI
 - Dark mode by default with light mode toggle
 - Focus on code readability in reviews
-- Actionable suggestions with inline context 
+- Actionable suggestions with inline context
+
+# GitHub Authentication System
+
+- NextAuth.js is used for GitHub OAuth integration
+- GitHub user ID (not UUID) is the consistent identifier for users
+- Two table architecture: users for profiles, accounts for OAuth data
+- auth.ts contains all authentication logic and token management
+- Session includes GitHub access token for API operations
+- Authentication errors are diagnosed with /api/debug/auth endpoint
+- Account connection issues are fixed with /api/fix-github-account endpoint
+
+# GitHub Repository Connection
+
+- Repositories are connected via full name (username/repository)
+- Repository data is stored in the repositories table with user ID association
+- Repository lookup is case-insensitive to prevent duplicates
+- GitHub API calls require the user's OAuth token from accounts table
+- Repository connection diagnostics in Connect Repository form
+- Repository user association can be fixed with Fix Repositories page
+
+# Common Issues
+
+- "No GitHub account connected" error occurs when the account record is missing
+- This can be fixed by using the diagnostic tool in the Connect Repository form
+- Or by logging out and logging back in with the updated auth system
+- Two user records with the same GitHub information can cause connection issues
+- Repositories may be associated with the wrong user ID (UUID vs GitHub ID) 

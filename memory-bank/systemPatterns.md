@@ -72,4 +72,98 @@ iDocument follows a modern web application architecture:
 4. **Smart Caching**:
    - Caching AI responses based on input determinism
    - Invalidating cache based on repository changes
-   - Progressive cache updates for partial results 
+   - Progressive cache updates for partial results
+
+# GitHub Integration System
+
+## Architecture
+- NextAuth.js for GitHub OAuth authentication
+- Two-table authentication system (users and accounts)
+- Repository management through GitHub API
+- Consistent user identification via GitHub provider ID
+- Session-based access token storage for API requests
+
+## Patterns
+- Repository connection with secure token handling
+- User-friendly error diagnostics and recovery
+- Automatic repository migration between user IDs
+- Case-insensitive repository matching
+- Self-healing authentication issues
+
+## Implementation Details
+- GitHub account data stored in accounts table
+- Repository data stored in repositories table with user association
+- Fix utilities for handling connection edge cases
+- Debug endpoints for system diagnostics
+- Authentication error recovery mechanisms
+
+## Examples
+```typescript
+// GitHub authentication with NextAuth.js
+export const { handlers, auth, signIn, signOut } = NextAuth({
+  providers: [
+    GitHub({
+      clientId: process.env.GITHUB_ID as string,
+      clientSecret: process.env.GITHUB_SECRET as string,
+      authorization: {
+        url: "https://github.com/login/oauth/authorize",
+        params: {
+          scope: "read:user user:email repo",
+        },
+      },
+    }),
+  ],
+  callbacks: {
+    async session({ session, token }) {
+      // Use GitHub ID consistently for the user ID
+      if (token.sub && session.user) {
+        session.user.id = token.sub;
+      }
+      
+      // Include access token in session
+      if (token.accessToken) {
+        session.accessToken = token.accessToken as string;
+      }
+      
+      return session;
+    },
+    async jwt({ token, account }) {
+      // Store GitHub access token
+      if (account) {
+        token.accessToken = account.access_token;
+      }
+      return token;
+    },
+  },
+});
+
+// GitHub repository connection
+export async function addRepository(formData: FormData) {
+  const fullName = formData.get('fullName') as string;
+  
+  // Get GitHub token from user's account
+  const account = await db
+    .select()
+    .from(accounts)
+    .where(eq(accounts.userId, userId))
+    .limit(1);
+    
+  const token = account[0].access_token;
+  
+  // Call GitHub API with user's token
+  const response = await fetch(`https://api.github.com/repos/${fullName}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: 'application/vnd.github+json',
+    },
+  });
+  
+  // Save repository data to database
+  const result = await db.insert(repositories).values({
+    name: repo.name,
+    fullName: repo.full_name,
+    owner: repo.owner.login,
+    url: repo.html_url,
+    userId: userId,
+  });
+} 
