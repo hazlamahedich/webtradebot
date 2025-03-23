@@ -78,29 +78,27 @@ export interface Documentation {
 }
 
 export interface QualityAssessment {
-  score: number; // 0-100
-  coverage: number; // 0-100
-  clarity: number; // 0-100
-  completeness: number; // 0-100
-  consistency: number; // 0-100
-  improvements: Array<{
-    componentId: string;
-    suggestion: string;
-    priority: "high" | "medium" | "low";
-  }>;
+  score: number;
+  coverage: number;
+  clarity: number;
+  completeness: number;
+  consistency: number;
+  improvements: {
+    title: string;
+    description: string;
+    example?: string;
+    priority?: 'high' | 'medium' | 'low';
+  }[];
 }
 
 export interface MissingDocumentation {
-  componentId: string;
-  type: string;
-  location: {
-    filePath: string;
-    startLine: number;
-    endLine: number;
-  };
-  impact: string;
-  severity: "critical" | "high" | "medium" | "low";
-  template: string;
+  componentType: string;
+  componentName: string;
+  filePath: string;
+  startLine?: number;
+  endLine?: number;
+  suggestedDocumentation: string;
+  severity?: 'critical' | 'high' | 'medium' | 'low';
 }
 
 export interface DocumentationDiagram {

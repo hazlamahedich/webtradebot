@@ -1,6 +1,8 @@
 import { db } from "@/lib/supabase/db";
 import { Documentation, DocumentationDiagram } from "./types";
 import { edgeCodeAnalysisModel } from "./models";
+import { eq } from "drizzle-orm";
+import { documentationRequests } from "@/lib/supabase/schema";
 
 /**
  * Interface for search parameters
@@ -31,6 +33,35 @@ export interface DocSearchResult {
   matchedComponents: string[];
   matchedContext: string;
   pullRequestId?: string;
+}
+
+/**
+ * Retrieves the most recent documentation for a specific repository
+ * @param repositoryId The repository ID to fetch documentation for
+ * @returns The most recent documentation or null if not found
+ */
+export async function getDocumentationForRepository(
+  repositoryId: string
+): Promise<Documentation | null> {
+  try {
+    // Query for the most recent completed documentation for this repository
+    const docRequest = await db.query.documentationRequests.findFirst({
+      where: eq(documentationRequests.repository_id, repositoryId),
+      orderBy: (requests, { desc }) => [desc(requests.created_at)],
+    });
+    
+    if (!docRequest || !docRequest.result) {
+      return null;
+    }
+    
+    // Parse the result JSON to get the documentation
+    const result = JSON.parse(docRequest.result.toString());
+    
+    return result.documentation || null;
+  } catch (error) {
+    console.error(`Error fetching documentation for repository ${repositoryId}:`, error);
+    return null;
+  }
 }
 
 /**

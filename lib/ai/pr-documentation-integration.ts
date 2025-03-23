@@ -2,6 +2,9 @@ import { startDocumentationGeneration } from "./documentation-generator";
 import { generateUniqueId } from "@/lib/utils";
 import { db } from "@/lib/supabase/db";
 import { PullRequestDetails } from "./types";
+import { getDocumentationForRepository } from "./documentation-search";
+import { documentationRequests } from "@/lib/supabase/schema";
+import { createPRComment } from "../github/api";
 
 /**
  * Integrates documentation generation with pull request workflow
@@ -161,6 +164,213 @@ export async function addDocumentationCommentToPR(
   }
 }
 
+// Documentation file patterns to identify documentation files
+const DOCUMENTATION_FILE_PATTERNS = [
+  /\.md$/i,
+  /README/i,
+  /docs?\//i,
+  /documentation\//i,
+  /\.rst$/i,
+  /\.adoc$/i,
+  /wiki\//i
+];
+
+// Code file extensions to trigger documentation checks
+const CODE_FILE_EXTENSIONS = [
+  '.js', '.jsx', '.ts', '.tsx', '.py', '.rb', '.java', '.go', 
+  '.cs', '.php', '.c', '.cpp', '.h', '.hpp', '.swift'
+];
+
+/**
+ * Checks if a file is likely a documentation file
+ */
+function isDocumentationFile(filePath: string): boolean {
+  return DOCUMENTATION_FILE_PATTERNS.some(pattern => pattern.test(filePath));
+}
+
+/**
+ * Checks if a file is a code file that should trigger documentation checks
+ */
+function isCodeFile(filePath: string): boolean {
+  const ext = filePath.substring(filePath.lastIndexOf('.'));
+  return CODE_FILE_EXTENSIONS.includes(ext);
+}
+
+/**
+ * Analyzes documentation impact of changes in a PR
+ */
+export async function analyzeDocumentationImpact(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  changedFiles: { 
+    filename: string, 
+    status: string,
+    additions: number, 
+    deletions: number,
+    patch?: string 
+  }[]
+): Promise<{
+  hasDocChanges: boolean,
+  docFiles: string[],
+  codeFiles: string[],
+  impactedComponents: string[],
+  needsDocumentation: boolean,
+  docImpactSummary: string
+}> {
+  try {
+    // Categorize changed files
+    const docFiles = changedFiles
+      .filter(file => isDocumentationFile(file.filename))
+      .map(file => file.filename);
+    
+    const codeFiles = changedFiles
+      .filter(file => isCodeFile(file.filename))
+      .map(file => file.filename);
+      
+    // Get existing documentation for this repository
+    const repoId = `${owner}/${repo}`;
+    const existingDocs = await getDocumentationForRepository(repoId);
+    
+    // Analyze which components might need documentation updates
+    const impactedComponents: string[] = [];
+    
+    if (existingDocs && existingDocs.components) {
+      // Map files to components that might be affected
+      for (const file of codeFiles) {
+        const relatedComponents = existingDocs.components.filter(component => 
+          component.filePath === file || 
+          (component.relatedFiles && component.relatedFiles.includes(file))
+        );
+        
+        impactedComponents.push(
+          ...relatedComponents.map(c => c.componentId)
+        );
+      }
+    }
+    
+    // Determine if documentation updates might be needed
+    const hasDocChanges = docFiles.length > 0;
+    const hasSignificantCodeChanges = codeFiles.length > 0 && 
+      changedFiles.some(f => isCodeFile(f.filename) && (f.additions + f.deletions > 20));
+    
+    const needsDocumentation = hasSignificantCodeChanges && !hasDocChanges;
+    
+    // Generate summary
+    let docImpactSummary = '';
+    
+    if (hasDocChanges) {
+      docImpactSummary = `This PR includes documentation changes to ${docFiles.length} file(s).`;
+    } else if (needsDocumentation) {
+      docImpactSummary = `This PR has significant code changes but no documentation updates. Consider updating documentation.`;
+      
+      if (impactedComponents.length > 0) {
+        docImpactSummary += ` Potentially affected components: ${impactedComponents.join(', ')}`;
+      }
+    } else if (codeFiles.length > 0) {
+      docImpactSummary = `This PR includes code changes. No documentation updates seem necessary.`;
+    } else {
+      docImpactSummary = `This PR doesn't appear to require documentation changes.`;
+    }
+    
+    return {
+      hasDocChanges,
+      docFiles,
+      codeFiles,
+      impactedComponents,
+      needsDocumentation,
+      docImpactSummary
+    };
+  } catch (error) {
+    console.error("Error analyzing documentation impact:", error);
+    return {
+      hasDocChanges: false,
+      docFiles: [],
+      codeFiles: [],
+      impactedComponents: [],
+      needsDocumentation: false,
+      docImpactSummary: `Error analyzing documentation impact: ${(error as Error).message}`
+    };
+  }
+}
+
+/**
+ * Integrates documentation checks into the PR review process
+ */
+export async function addDocumentationChecksToPR(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  changedFiles: { 
+    filename: string, 
+    status: string,
+    additions: number, 
+    deletions: number,
+    patch?: string 
+  }[]
+): Promise<void> {
+  try {
+    // Analyze the documentation impact
+    const impact = await analyzeDocumentationImpact(
+      owner, 
+      repo, 
+      pullNumber, 
+      changedFiles
+    );
+    
+    // Add a comment to the PR with the documentation check results
+    const commentBody = `## Documentation Check
+
+${impact.docImpactSummary}
+
+${impact.needsDocumentation ? 
+  '⚠️ **Documentation Update Recommended**: Significant code changes detected without corresponding documentation updates.' : 
+  impact.hasDocChanges ? 
+    '✅ **Documentation Updated**: This PR includes documentation changes.' : 
+    '✓ **Documentation Status**: No documentation updates needed for this change.'
+}
+
+${impact.impactedComponents.length > 0 ? 
+  `### Affected Components\n\n${impact.impactedComponents.map(c => `- \`${c}\``).join('\n')}` : 
+  ''
+}`;
+
+    // Post the comment to the PR
+    await createPRComment(owner, repo, pullNumber, commentBody);
+    
+    // If this PR has documentation changes, trigger documentation generation
+    if (impact.hasDocChanges) {
+      const repoId = `${owner}/${repo}`;
+      const documentationId = `doc_pr_${pullNumber}_${Date.now()}`;
+      
+      // Store the documentation request in the database
+      await db.insert({
+        id: documentationId,
+        repository_id: repoId,
+        owner,
+        repo,
+        branch: 'pull/' + pullNumber,
+        status: "processing",
+        created_at: new Date().toISOString(),
+        user_id: 'system', // Use system user for PR-triggered generations
+      }).into(documentationRequests);
+      
+      // Start documentation generation
+      await startDocumentationGeneration({
+        documentationId,
+        repositoryId: repoId,
+        owner,
+        repo,
+        branch: 'pull/' + pullNumber,
+        filePaths: [...impact.docFiles, ...impact.codeFiles], // Include both doc and code files
+        userId: 'system'
+      });
+    }
+  } catch (error) {
+    console.error("Error adding documentation checks to PR:", error);
+  }
+}
+
 /**
  * Webhook handler for PR events to trigger documentation generation
  */
@@ -203,28 +413,24 @@ export async function handlePRWebhook(
         },
       };
       
-      // Find a user to associate with the documentation generation
-      // In a real implementation, you'd likely use a bot account or the PR creator
-      const { db } = await import("@/lib/supabase/db");
-      const orgMembers = await db
-        .select('user_id')
-        .from('organization_members')
-        .where({ 
-          organization_id: await getOrganizationIdFromRepo(pr.repository.id)
-        })
-        .limit(1);
+      // Get the changed files from the PR
+      const accessToken = process.env.GITHUB_ACCESS_TOKEN as string;
+      const githubClient = new GitHubClient(accessToken);
+      const changedFiles = await githubClient.getPullRequestFiles(
+        payload.repository.owner.login,
+        payload.repository.name,
+        payload.pull_request.number
+      );
       
-      const userId = orgMembers.length > 0 
-        ? orgMembers[0].user_id 
-        : 'system';
+      // Add documentation checks to the PR
+      await addDocumentationChecksToPR(
+        payload.repository.owner.login,
+        payload.repository.name,
+        payload.pull_request.number,
+        changedFiles
+      );
       
-      // Start documentation generation
-      const documentationId = await integrateDocumentationWithPR(pr, userId);
-      
-      if (documentationId !== "NO_DOCUMENTABLE_FILES") {
-        // Add comment to PR with documentation links
-        await addDocumentationCommentToPR(pr, documentationId);
-      }
+      // Continue with existing PR processing...
     }
   } catch (error) {
     console.error("Error handling PR webhook:", error);

@@ -103,11 +103,35 @@ export class GitHubClient {
     owner: string,
     repo: string,
     pull_number: number
-  ): Promise<{ filename: string; patch?: string; changes: number }[]> {
+  ): Promise<{ filename: string; patch?: string; changes: number; additions: number; deletions: number; status: string }[]> {
     const { data } = await this.octokit.pulls.listFiles({
       owner,
       repo,
       pull_number,
+    });
+
+    return data;
+  }
+
+  /**
+   * Creates a comment on a pull request
+   * @param owner Repository owner
+   * @param repo Repository name
+   * @param pullNumber Pull request number
+   * @param body Comment body
+   * @returns The created comment
+   */
+  async createPRComment(
+    owner: string,
+    repo: string,
+    pullNumber: number,
+    body: string
+  ): Promise<any> {
+    const { data } = await this.octokit.issues.createComment({
+      owner,
+      repo,
+      issue_number: pullNumber,
+      body,
     });
 
     return data;
