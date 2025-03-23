@@ -1,4 +1,4 @@
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import {
   Card,
@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { GitHubLogoIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 import { addRepository } from "../actions";
+import ConnectRepositoryForm from "./connect-repository-form";
 
 export default async function AddRepositoryPage() {
   const session = await auth();
@@ -58,27 +59,7 @@ export default async function AddRepositoryPage() {
               </div>
             </div>
             
-            <form action={addRepository} className="space-y-4">
-              <div className="space-y-2">
-                <label htmlFor="fullName" className="text-sm font-medium">
-                  Repository Name
-                </label>
-                <div className="flex gap-2">
-                  <div className="flex-1">
-                    <Input
-                      id="fullName"
-                      name="fullName"
-                      placeholder="owner/repository"
-                      required
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Format: username/repository or organization/repository
-                    </p>
-                  </div>
-                  <Button type="submit">Connect</Button>
-                </div>
-              </div>
-            </form>
+            <ConnectRepositoryForm />
           </div>
         </CardContent>
         <CardFooter className="flex flex-col items-start bg-muted/50 border-t">

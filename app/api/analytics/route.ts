@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 import { db } from "@/lib/supabase/db";
 import { codeReviews, pullRequests, repositories, reviewComments } from "@/lib/supabase/schema";
 import { desc, eq, and, sql, count, countDistinct, avg } from "drizzle-orm";

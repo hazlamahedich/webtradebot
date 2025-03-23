@@ -1,6 +1,6 @@
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 import { db } from "@/lib/supabase/db";
-import { reviews, pullRequests, repositories } from "@/lib/supabase/schema";
+import { codeReviews, pullRequests, repositories } from "@/lib/supabase/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -17,6 +17,10 @@ import { Badge } from "@/components/ui/badge";
 import { GitHubLogoIcon, ExternalLinkIcon } from "@radix-ui/react-icons";
 import { formatDistanceToNow } from "date-fns";
 
+// Set Node.js runtime for this page
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export default async function DashboardPage() {
   const session = await auth();
   
@@ -24,25 +28,43 @@ export default async function DashboardPage() {
     return redirect("/auth/signin");
   }
   
-  // Get user repositories
+  console.log('Dashboard - Session User:', {
+    id: session.user.id,
+    name: session.user.name,
+    email: session.user.email
+  });
+  
+  // Get user repositories with detailed logging
+  console.log('Dashboard - Fetching repositories for user ID:', session.user.id);
+  
+  // Raw SQL query for debugging
+  const rawRepoCount = await db.execute(
+    sql`SELECT COUNT(*) FROM repositories WHERE user_id = ${session.user.id}`
+  );
+  console.log('Dashboard - Raw SQL repository count:', JSON.stringify(rawRepoCount, null, 2));
+  
+  // ORM query
   const userRepos = await db.query.repositories.findMany({
     where: eq(repositories.userId, session.user.id),
     orderBy: [desc(repositories.updatedAt)],
     limit: 5,
   });
   
+  console.log('Dashboard - Found repositories:', userRepos.length);
+  console.log('Dashboard - Repository details:', JSON.stringify(userRepos, null, 2));
+  
   // Get recent reviews
   const recentReviews = await db
     .select({
-      review: reviews,
+      review: codeReviews,
       pr: pullRequests,
       repo: repositories,
     })
-    .from(reviews)
-    .innerJoin(pullRequests, eq(reviews.pullRequestId, pullRequests.id))
+    .from(codeReviews)
+    .innerJoin(pullRequests, eq(codeReviews.prId, pullRequests.id))
     .innerJoin(repositories, eq(pullRequests.repoId, repositories.id))
     .where(eq(repositories.userId, session.user.id))
-    .orderBy(desc(reviews.updatedAt))
+    .orderBy(desc(codeReviews.updatedAt))
     .limit(5);
   
   // Get stats
@@ -218,49 +240,54 @@ function StatCard({
 }
 
 async function getStats(userId: string) {
-  // Total reviews
-  const totalReviewsResult = await db
-    .select({ count: sql<number>`count(*)` })
-    .from(reviews)
-    .innerJoin(pullRequests, eq(reviews.pullRequestId, pullRequests.id))
-    .innerJoin(repositories, eq(pullRequests.repoId, repositories.id))
-    .where(eq(repositories.userId, userId));
+  console.log('Dashboard - Getting stats for user ID:', userId);
   
-  // Total repositories
+  // Total repositories with detailed logging
+  console.log('Dashboard - Running repository count query for user ID:', userId);
   const totalReposResult = await db
     .select({ count: sql<number>`count(*)` })
     .from(repositories)
     .where(eq(repositories.userId, userId));
   
+  console.log('Dashboard - Repository count result:', JSON.stringify(totalReposResult, null, 2));
+  
+  // Total reviews
+  const totalReviewsResult = await db
+    .select({ count: sql<number>`count(*)` })
+    .from(codeReviews)
+    .innerJoin(pullRequests, eq(codeReviews.prId, pullRequests.id))
+    .innerJoin(repositories, eq(pullRequests.repoId, repositories.id))
+    .where(eq(repositories.userId, userId));
+  
   // Total issues (bugs + code quality issues)
   const completedReviews = await db
     .select({
-      review: reviews,
+      review: codeReviews,
     })
-    .from(reviews)
-    .innerJoin(pullRequests, eq(reviews.pullRequestId, pullRequests.id))
+    .from(codeReviews)
+    .innerJoin(pullRequests, eq(codeReviews.prId, pullRequests.id))
     .innerJoin(repositories, eq(pullRequests.repoId, repositories.id))
     .where(
       and(
         eq(repositories.userId, userId),
-        eq(reviews.status, "completed")
+        eq(codeReviews.status, "completed")
       )
     );
   
   let totalIssues = 0;
   for (const { review } of completedReviews) {
-    if (review.result) {
+    if (review.feedback) {
       try {
-        const result = typeof review.result === 'string'
-          ? JSON.parse(review.result)
-          : review.result;
+        const result = typeof review.feedback === 'string'
+          ? JSON.parse(review.feedback)
+          : review.feedback;
           
         totalIssues += 
           (result.analysis?.bugs?.length || 0) + 
           (result.analysis?.codeQuality?.length || 0) +
           (result.analysis?.security?.length || 0);
       } catch (error) {
-        console.error('Error parsing review result:', error);
+        console.error('Error parsing review feedback:', error);
       }
     }
   }

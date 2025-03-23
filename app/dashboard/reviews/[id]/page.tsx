@@ -1,6 +1,6 @@
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 import { db } from "@/lib/supabase/db";
-import { reviews, pullRequests, repositories } from "@/lib/supabase/schema";
+import { codeReviews, pullRequests, repositories } from "@/lib/supabase/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import {
@@ -31,14 +31,14 @@ export default async function ReviewDetailPage({
   // Get the review with PR and repo data
   const reviewData = await db
     .select({
-      review: reviews,
+      review: codeReviews,
       pr: pullRequests,
       repo: repositories,
     })
-    .from(reviews)
-    .innerJoin(pullRequests, eq(reviews.pullRequestId, pullRequests.id))
+    .from(codeReviews)
+    .innerJoin(pullRequests, eq(codeReviews.prId, pullRequests.id))
     .innerJoin(repositories, eq(pullRequests.repoId, repositories.id))
-    .where(eq(reviews.id, params.id))
+    .where(eq(codeReviews.id, params.id))
     .limit(1);
   
   if (reviewData.length === 0) {
@@ -354,14 +354,14 @@ async function refreshReview(formData: FormData) {
   // Get the existing review data
   const reviewData = await db
     .select({
-      review: reviews,
+      review: codeReviews,
       pr: pullRequests,
       repo: repositories,
     })
-    .from(reviews)
-    .innerJoin(pullRequests, eq(reviews.pullRequestId, pullRequests.id))
+    .from(codeReviews)
+    .innerJoin(pullRequests, eq(codeReviews.prId, pullRequests.id))
     .innerJoin(repositories, eq(pullRequests.repoId, repositories.id))
-    .where(eq(reviews.id, reviewId))
+    .where(eq(codeReviews.id, reviewId))
     .limit(1);
   
   if (reviewData.length === 0) {
@@ -381,12 +381,11 @@ async function refreshReview(formData: FormData) {
   
   // Update review status to pending
   await db
-    .update(reviews)
+    .update(codeReviews)
     .set({ 
       status: "pending",
-      updatedAt: new Date(),
-      error: null,
-      result: null
+      summary: null,
+      feedback: null
     })
-    .where(eq(reviews.id, reviewId));
+    .where(eq(codeReviews.id, reviewId));
 } 

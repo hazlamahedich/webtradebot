@@ -1,5 +1,7 @@
 "use client";
 
+export const runtime = 'nodejs';
+
 import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";

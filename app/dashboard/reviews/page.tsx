@@ -1,6 +1,6 @@
-import { auth } from "@/auth";
+import { auth } from "@/lib/auth";
 import { db } from "@/lib/supabase/db";
-import { reviews, pullRequests, repositories } from "@/lib/supabase/schema";
+import { codeReviews, pullRequests, repositories } from "@/lib/supabase/schema";
 import { eq, desc } from "drizzle-orm";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
@@ -54,15 +54,15 @@ export default async function ReviewsPage() {
   // Get reviews with PR and repo data
   const reviewsData = await db
     .select({
-      review: reviews,
+      review: codeReviews,
       pr: pullRequests,
       repo: repositories,
     })
-    .from(reviews)
-    .innerJoin(pullRequests, eq(reviews.pullRequestId, pullRequests.id))
+    .from(codeReviews)
+    .innerJoin(pullRequests, eq(codeReviews.prId, pullRequests.id))
     .innerJoin(repositories, eq(pullRequests.repoId, repositories.id))
-    .where(repositories.userId = session.user.id)
-    .orderBy(desc(reviews.updatedAt))
+    .where(eq(repositories.userId, session.user.id))
+    .orderBy(desc(codeReviews.updatedAt))
     .limit(20);
   
   return (
