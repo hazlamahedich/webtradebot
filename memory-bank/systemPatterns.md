@@ -166,4 +166,173 @@ export async function addRepository(formData: FormData) {
     url: repo.html_url,
     userId: userId,
   });
-} 
+}
+
+# Code Review System
+
+## Architecture
+- Automated code review triggered by GitHub webhooks
+- Webhook handlers for pull request events (opened, synchronize)
+- Parallel review and documentation analysis processes
+- Database tracking of PRs and review status
+- Integration with GitHub API for PR details and comments
+
+## Review Process Flow
+1. **Webhook Reception**:
+   - GitHub sends webhook events to /api/webhooks/github/route.ts
+   - Webhook signature is verified for security
+   - Event type and action are extracted for processing
+
+2. **PR Event Handling**:
+   - handlePRReviewEvent processes pull_request events
+   - Only 'opened' and 'synchronize' actions trigger reviews
+   - PR data is extracted and normalized for processing
+
+3. **Database Operations**:
+   - System checks if repository exists in database
+   - Creates or updates pull request record
+   - Creates new review record or updates existing one
+   - Tracks review status (queued, in_progress, completed, failed)
+
+4. **AI Review Generation**:
+   - startCodeReviewFlow initiates LangGraph workflow
+   - GitHub API fetches PR details and file changes
+   - Code is analyzed for bugs, improvements, and best practices
+   - Review results are structured and stored in the database
+
+5. **Review Publishing**:
+   - When review completes, postReviewCommentOnPR is triggered
+   - Review results are formatted as GitHub comment
+   - Comment is posted to the PR using GitHub API
+   - Review status is updated to 'completed'
+
+## Implementation Details
+```typescript
+// Webhook handler for GitHub events
+export async function POST(req: Request) {
+  try {
+    // Get event type from headers
+    const eventType = headers().get('x-github-event');
+    
+    // Verify webhook signature
+    const signature = headers().get('x-hub-signature-256');
+    const isValid = verifySignature(await req.text(), signature);
+    
+    if (!isValid) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    }
+    
+    // Parse payload and handle PR events
+    const payload = await req.json();
+    
+    if (eventType === 'pull_request') {
+      // Trigger review handlers
+      await handlePRWebhook(eventType, payload);
+      await handlePRReviewEvent(eventType, payload);
+    }
+  } catch (error) {
+    return NextResponse.json({ error: `Failed to process webhook: ${error.message}` }, { status: 500 });
+  }
+}
+
+// PR Review event handler
+export async function handlePRReviewEvent(event: string, payload: any) {
+  // Only handle opened or updated PRs
+  if (payload.action === 'opened' || payload.action === 'synchronize') {
+    await createCodeReviewForPR(
+      payload.repository.owner.login,
+      payload.repository.name,
+      payload.pull_request.number,
+      {
+        id: String(payload.pull_request.id),
+        number: payload.pull_request.number,
+        title: payload.pull_request.title,
+        // Additional PR details...
+      }
+    );
+  }
+}
+
+// Code review creation
+export async function createCodeReviewForPR(owner: string, repo: string, pullNumber: number, pullRequest: any) {
+  // Check if repository exists in database
+  const repository = await db.query.repositories.findFirst({
+    where: eq(repositories.fullName, `${owner}/${repo}`),
+  });
+  
+  if (!repository) {
+    return { success: false, error: `Repository ${owner}/${repo} not found in database` };
+  }
+  
+  // Create or update PR record
+  let prId;
+  const existingPR = await db.query.pullRequests.findFirst({
+    where: and(
+      eq(pullRequests.repositoryId, repository.id),
+      eq(pullRequests.number, pullNumber)
+    ),
+  });
+  
+  if (existingPR) {
+    // Update existing PR
+    prId = existingPR.id;
+  } else {
+    // Create new PR record
+    const insertResult = await db.insert(pullRequests)
+      .values({
+        repositoryId: repository.id,
+        number: pullNumber,
+        title: pullRequest.title,
+        // Additional PR details...
+      })
+      .returning({ id: pullRequests.id });
+    
+    prId = insertResult[0].id;
+  }
+  
+  // Create or update review record
+  let reviewId;
+  const existingReview = await db.query.codeReviews.findFirst({
+    where: eq(codeReviews.pullRequestId, prId),
+  });
+  
+  if (existingReview && existingReview.status === 'failed') {
+    // Update failed review
+    reviewId = existingReview.id;
+    await db.update(codeReviews)
+      .set({ status: 'queued', updatedAt: new Date() })
+      .where(eq(codeReviews.id, reviewId));
+  } else if (!existingReview) {
+    // Create new review
+    const insertResult = await db.insert(codeReviews)
+      .values({
+        pullRequestId: prId,
+        status: 'queued',
+      })
+      .returning({ id: codeReviews.id });
+    
+    reviewId = insertResult[0].id;
+  } else {
+    // Use existing review
+    reviewId = existingReview.id;
+  }
+  
+  // Start the code review flow
+  await startCodeReviewFlow({
+    reviewId,
+    owner,
+    repo,
+    pullNumber,
+  });
+  
+  return { success: true, reviewId };
+}
+
+## Code Review Processing Patterns
+1. **Parallel Processing**: Documentation and code review run in parallel workflows
+2. **Status Tracking**: Database records track review progress and status
+3. **Error Recovery**: Failed reviews can be retried or restarted
+4. **Incremental Analysis**: Code is analyzed at the file level with context awareness
+5. **Smart Suggestions**: Review results include specific suggestions with locations
+6. **Automated Publishing**: Comments are automatically posted to GitHub PRs
+7. **Event-Driven Architecture**: Webhooks trigger reviews without user intervention

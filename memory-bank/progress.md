@@ -38,6 +38,15 @@
   - Fix utility for account connection issues
   - User-friendly error messages and diagnostics
   - Automatic migration of repositories between user IDs
+- Automatic Code Review System
+  - GitHub webhook integration for PR events
+  - PR and review status tracking in database
+  - LangGraph workflow for code analysis
+  - Smart review generation with contextual understanding
+  - Automatic comment posting to GitHub PRs
+  - Support for new PRs and PR updates
+  - Review status tracking (queued, in_progress, completed, failed)
+  - Error handling and retry capability
 
 ## In Progress
 - Setting up NextAuth.js with GitHub OAuth
@@ -92,6 +101,16 @@ We have completed Phase 4 (Launch) by setting up comprehensive documentation, te
 
 3. **Enhanced Quality Assessment**: We've created a detailed quality analysis component that provides metrics on documentation coverage, clarity, completeness, and consistency. It also provides specific improvement recommendations and detects missing documentation.
 
+We've also implemented the Automatic Code Review System, which is a core feature from Phase 2:
+
+1. **GitHub Webhook Integration**: The system automatically captures pull request events (opened and synchronized) and triggers code reviews without user intervention.
+
+2. **Intelligent Code Analysis**: PRs are analyzed using a LangGraph workflow that examines code changes and provides comprehensive feedback on bugs, improvements, and best practices.
+
+3. **Automated Review Comments**: When a review is completed, the system automatically posts a detailed comment to the GitHub PR with the analysis results, making it easy for developers to see feedback directly in their workflow.
+
+4. **Review Status Tracking**: The system tracks the status of reviews in the database, allowing for visibility into the review process and support for retry/recovery of failed reviews.
+
 We're continuing to focus on completing Phase 1 (Foundation) elements for the core application workflow before implementing other Phase 2 and Phase 3 features.
 
 ## Known Issues
@@ -110,6 +129,9 @@ We're continuing to focus on completing Phase 1 (Foundation) elements for the co
 - Created fix-github-account API endpoint to repair broken connections
 - Enhanced Connect Repository form with better error handling
 - Implemented consistent user ID usage with GitHub provider ID
+- Fixed GitHub webhook tests for better reliability
+- Improved error handling in PR review integration
+- Added support for repository not found scenarios
 
 ## What's Left
 - Cleanup of duplicate user records
