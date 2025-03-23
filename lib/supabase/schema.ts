@@ -250,6 +250,30 @@ export const documentationDiagrams = pgTable("documentation_diagrams", {
   created_at: timestamp("created_at", { mode: "date" }).defaultNow(),
 });
 
+// User Sessions for enhanced session management
+export const userSessions = pgTable("user_sessions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  user_id: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  session_data: json("session_data"),
+  last_updated: timestamp("last_updated", { mode: "date" }).defaultNow(),
+  created_at: timestamp("created_at", { mode: "date" }).defaultNow(),
+});
+
+// ServerlessOptimization Metrics
+export const serverlessMetrics = pgTable("serverless_metrics", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  function_name: text("function_name").notNull(),
+  execution_time_ms: integer("execution_time_ms").notNull(),
+  memory_usage_mb: integer("memory_usage_mb"),
+  status: text("status").notNull(),
+  error_message: text("error_message"),
+  request_id: text("request_id"),
+  user_id: text("user_id").references(() => users.id),
+  created_at: timestamp("created_at", { mode: "date" }).defaultNow(),
+});
+
 // Relations
 export const userRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
@@ -262,6 +286,7 @@ export const userRelations = relations(users, ({ many }) => ({
   sentNotifications: many(notifications, { relationName: "notificationSender" }),
   documentationRequests: many(documentationRequests),
   documentationVersions: many(documentationVersions),
+  userSessions: many(userSessions),
 }));
 
 export const repositoryRelations = relations(repositories, ({ one, many }) => ({
@@ -363,5 +388,12 @@ export const documentationDiagramsRelations = relations(documentationDiagrams, (
   documentationRequest: one(documentationRequests, {
     fields: [documentationDiagrams.doc_id],
     references: [documentationRequests.id],
+  }),
+}));
+
+export const serverlessMetricsRelations = relations(serverlessMetrics, ({ one }) => ({
+  user: one(users, {
+    fields: [serverlessMetrics.user_id],
+    references: [users.id],
   }),
 })); 

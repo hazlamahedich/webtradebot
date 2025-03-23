@@ -44,6 +44,11 @@ export default async function DashboardLayout({
             </Link>
           </div>
           <div className="py-2">
+            <Link href="/dashboard/serverless-test" className="flex gap-2 hover:text-blue-600">
+              Serverless Test
+            </Link>
+          </div>
+          <div className="py-2">
             <Link href="/dashboard/settings" className="flex gap-2 hover:text-blue-600">
               Settings
             </Link>
