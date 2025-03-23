@@ -15,7 +15,8 @@
     "test:docs:all": "jest --testMatch=\"{**/__tests__/ai/documentation-generator.test.[jt]s?(x),**/__tests__/api/webhooks/documentation-processor.test.[jt]s?(x)}\"",
     "test:docs:e2e": "ts-node scripts/test-documentation-generation.ts",
     "test:coverage": "jest --coverage",
-    "test:ai": "jest --testMatch=\"**/__tests__/ai/{code-review-minimal,documentation-prompts,models,pr-review-integration}.test.[jt]s?(x)\""
+    "test:ai": "jest --testMatch=\"**/__tests__/ai/{code-review-minimal,documentation-prompts,models,pr-review-integration}.test.[jt]s?(x)\"",
+    "db:migrate": "ts-node lib/supabase/migrate-db.ts"
   },
   "dependencies": {
     "@langchain/core": "^0.3.42",
@@ -41,6 +42,7 @@
     "date-fns": "^3.6.0",
     "drizzle-orm": "^0.29.3",
     "langchain": "^0.3.19",
+    "litellm": "^0.12.0",
     "lucide-react": "^0.483.0",
     "next": "^15.2.3",
     "next-auth": "^5.0.0-beta.25",

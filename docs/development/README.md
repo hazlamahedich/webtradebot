@@ -1,24 +1,27 @@
-# iDocument Development Guide
+# Development Guide
 
-This section contains documentation for developers who want to contribute to iDocument or understand its architecture.
+This guide provides information for developers who want to contribute to or extend the iDocument Code Review Assistant.
 
-## Contents
+## Table of Contents
 
-- [Architecture Overview](./architecture.md)
-- [Setup Development Environment](./setup.md)
-- [Code Structure](./code-structure.md)
-- [API Documentation](./api.md)
-- [Testing](./testing.md)
+- [Project Structure](./project-structure.md)
+- [Development Environment Setup](./environment-setup.md)
+- [API Documentation](./api-documentation.md)
+- [LLM Integration](./llm-integration.md)
 - [Contributing Guidelines](./contributing.md)
+- [Testing](./testing.md)
+- [Code Style Guide](./code-style.md)
+- [Architecture Overview](./architecture.md)
 
-## Getting Started for Developers
+## Quick Start
 
-To get started with development:
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Set up your environment variables (see `.env.example`)
+4. Run the development server: `npm run dev`
+5. Open [http://localhost:3000](http://localhost:3000) in your browser
 
-1. Follow the [Setup Development Environment](./setup.md) guide
-2. Familiarize yourself with the [Architecture Overview](./architecture.md)
-3. Understand our [Code Structure](./code-structure.md)
-4. Review the [Contributing Guidelines](./contributing.md) before submitting changes
+For more detailed instructions, see the [Development Environment Setup](./environment-setup.md) guide.
 
 ## Tech Stack
 
