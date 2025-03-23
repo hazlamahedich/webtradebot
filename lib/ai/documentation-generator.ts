@@ -102,6 +102,19 @@ const QualityAssessmentSchema = z.object({
   })),
 });
 
+const MissingDocumentationSchema = z.object({
+  componentId: z.string(),
+  type: z.string(),
+  location: z.object({
+    filePath: z.string(),
+    startLine: z.number(),
+    endLine: z.number(),
+  }),
+  impact: z.string(),
+  severity: z.enum(["critical", "high", "medium", "low"]),
+  template: z.string(),
+});
+
 /**
  * Creates a documentation generation workflow using LangGraph
  */
@@ -304,31 +317,35 @@ export const createDocumentationGraph = async (requestData: {
     },
   });
 
-  // Identify missing documentation
-  graph.addNode("identifyMissingDocs", {
+  // Detect missing documentation
+  graph.addNode("detectMissingDocs", {
     run: async (state) => {
       try {
         const { codeAnalysis, documentation } = state;
         
-        // Find components that don't have corresponding documentation
-        const documentedComponents = new Set(documentation.components.map(doc => doc.componentId));
-        const missingDocs = codeAnalysis.components
-          .filter(component => !documentedComponents.has(component.name))
-          .map(component => ({
-            componentId: component.name,
-            type: component.type,
-            location: component.location,
-          }));
+        // Create a prompt for the LLM to identify missing documentation
+        const missingDocsChain = RunnableSequence.from([
+          documentationPrompts.missingDocsPrompt,
+          codeAnalysisModel,
+          StructuredOutputParser.fromZodSchema(z.array(MissingDocumentationSchema)),
+        ]);
+
+        const missingDocs = await missingDocsChain.invoke({
+          documentation: JSON.stringify(documentation),
+          analysis: JSON.stringify(codeAnalysis),
+        });
 
         return {
           ...state,
           missingDocs,
         };
       } catch (error) {
-        console.error("Error identifying missing docs:", error);
+        console.error("Error detecting missing documentation:", error);
         return {
           ...state,
-          error: `Failed to identify missing docs: ${(error as Error).message}`,
+          error: `Failed to detect missing documentation: ${(error as Error).message}`,
+          // Provide empty array to avoid null pointer issues
+          missingDocs: [],
         };
       }
     },
@@ -385,8 +402,8 @@ export const createDocumentationGraph = async (requestData: {
   graph.addEdge("parseCode", "analyzeCode");
   graph.addEdge("analyzeCode", "generateDocumentation");
   graph.addEdge("generateDocumentation", "assessQuality");
-  graph.addEdge("assessQuality", "identifyMissingDocs");
-  graph.addEdge("identifyMissingDocs", "generateDiagrams");
+  graph.addEdge("assessQuality", "detectMissingDocs");
+  graph.addEdge("detectMissingDocs", "generateDiagrams");
 
   // Compile the graph
   const app = await graph.compile();

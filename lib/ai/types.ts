@@ -98,6 +98,9 @@ export interface MissingDocumentation {
     startLine: number;
     endLine: number;
   };
+  impact: string;
+  severity: "critical" | "high" | "medium" | "low";
+  template: string;
 }
 
 export interface DocumentationDiagram {

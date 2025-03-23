@@ -8,6 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, FileText, Code, Activity, Share2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { DocumentationEditor } from "@/components/documentation/editor";
+import { QualityAnalysis } from "@/components/documentation/quality-analysis";
 
 // This is a placeholder for Markdown rendering - in a real implementation, you'd use a proper Markdown library
 const MarkdownRenderer = ({ content }: { content: string }) => (
@@ -29,6 +31,7 @@ export default function DocumentationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [documentation, setDocumentation] = useState<any>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     const fetchDocumentation = async () => {
@@ -52,6 +55,36 @@ export default function DocumentationDetailPage() {
       fetchDocumentation();
     }
   }, [params.id]);
+
+  const handleSaveDocumentation = async (updatedDoc: any) => {
+    try {
+      const response = await fetch(`/api/documentation/update`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          documentationId: params.id,
+          documentation: updatedDoc,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update documentation");
+      }
+
+      // Refresh the documentation
+      const refreshResponse = await fetch(`/api/documentation?id=${params.id}`);
+      const refreshData = await refreshResponse.json();
+      setDocumentation(refreshData);
+      
+      setIsEditing(false);
+    } catch (error) {
+      console.error("Failed to save documentation:", error);
+      // You might want to display an error message to the user
+    }
+  };
 
   if (loading) {
     return (
@@ -120,42 +153,56 @@ export default function DocumentationDetailPage() {
         </TabsList>
 
         <TabsContent value="overview" className="p-4 border rounded-md mt-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Documentation Overview</CardTitle>
-              <CardDescription>
-                High-level overview of the codebase.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <MarkdownRenderer content={docContent.overview} />
-            </CardContent>
-          </Card>
+          {isEditing ? (
+            <DocumentationEditor 
+              documentation={docContent} 
+              onSave={handleSaveDocumentation} 
+            />
+          ) : (
+            <>
+              <div className="flex justify-end mb-4">
+                <Button onClick={() => setIsEditing(true)}>
+                  Edit Documentation
+                </Button>
+              </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Documentation Overview</CardTitle>
+                  <CardDescription>
+                    High-level overview of the codebase.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <MarkdownRenderer content={docContent.overview} />
+                </CardContent>
+              </Card>
 
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Usage Guide</CardTitle>
-              <CardDescription>
-                How to use this codebase.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <MarkdownRenderer content={docContent.usageGuide} />
-            </CardContent>
-          </Card>
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle>Usage Guide</CardTitle>
+                  <CardDescription>
+                    How to use this codebase.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <MarkdownRenderer content={docContent.usageGuide} />
+                </CardContent>
+              </Card>
 
-          {docContent.setup && (
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle>Setup Instructions</CardTitle>
-                <CardDescription>
-                  How to set up and run this codebase.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <MarkdownRenderer content={docContent.setup} />
-              </CardContent>
-            </Card>
+              {docContent.setup && (
+                <Card className="mt-6">
+                  <CardHeader>
+                    <CardTitle>Setup Instructions</CardTitle>
+                    <CardDescription>
+                      How to set up and run this codebase.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <MarkdownRenderer content={docContent.setup} />
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
         </TabsContent>
 
@@ -264,169 +311,10 @@ export default function DocumentationDetailPage() {
         </TabsContent>
 
         <TabsContent value="quality" className="p-4 border rounded-md mt-2">
-          {result.qualityAssessment ? (
-            <>
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Overall Score</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex items-center">
-                      <div className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold bg-primary/10 text-primary">
-                        {result.qualityAssessment.score}
-                      </div>
-                      <div className="ml-4">
-                        <p className="text-sm text-gray-500">
-                          {result.qualityAssessment.score < 50
-                            ? "Needs significant improvement"
-                            : result.qualityAssessment.score < 75
-                            ? "Good but can be better"
-                            : "Excellent documentation"}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-lg">Metrics</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm">Coverage</span>
-                        <div className="flex items-center">
-                          <span className="mr-2">{result.qualityAssessment.coverage}%</span>
-                          <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary"
-                              style={{ width: `${result.qualityAssessment.coverage}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm">Clarity</span>
-                        <div className="flex items-center">
-                          <span className="mr-2">{result.qualityAssessment.clarity}%</span>
-                          <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary"
-                              style={{ width: `${result.qualityAssessment.clarity}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm">Completeness</span>
-                        <div className="flex items-center">
-                          <span className="mr-2">{result.qualityAssessment.completeness}%</span>
-                          <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary"
-                              style={{ width: `${result.qualityAssessment.completeness}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm">Consistency</span>
-                        <div className="flex items-center">
-                          <span className="mr-2">{result.qualityAssessment.consistency}%</span>
-                          <div className="w-20 h-2 bg-gray-200 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-primary"
-                              style={{ width: `${result.qualityAssessment.consistency}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Improvement Suggestions</CardTitle>
-                  <CardDescription>
-                    Ways to improve the documentation quality.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {result.qualityAssessment.improvements.length > 0 ? (
-                    <div className="space-y-4">
-                      {result.qualityAssessment.improvements.map((improvement: any, index: number) => (
-                        <div key={index} className="border-l-4 pl-4 py-1" style={{
-                          borderColor: improvement.priority === "high" 
-                            ? "rgb(239, 68, 68)" 
-                            : improvement.priority === "medium" 
-                            ? "rgb(249, 115, 22)" 
-                            : "rgb(59, 130, 246)"
-                        }}>
-                          <h4 className="font-medium">
-                            {improvement.componentId}
-                            <span className="ml-2 text-xs px-2 py-0.5 rounded-full" style={{
-                              backgroundColor: improvement.priority === "high" 
-                                ? "rgb(254, 226, 226)" 
-                                : improvement.priority === "medium" 
-                                ? "rgb(255, 237, 213)" 
-                                : "rgb(219, 234, 254)",
-                              color: improvement.priority === "high" 
-                                ? "rgb(185, 28, 28)" 
-                                : improvement.priority === "medium" 
-                                ? "rgb(194, 65, 12)" 
-                                : "rgb(29, 78, 216)"
-                            }}>
-                              {improvement.priority}
-                            </span>
-                          </h4>
-                          <p className="text-sm mt-1">{improvement.suggestion}</p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-gray-500">No improvement suggestions available.</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              {result.missingDocs && result.missingDocs.length > 0 && (
-                <Card className="mt-6">
-                  <CardHeader>
-                    <CardTitle>Missing Documentation</CardTitle>
-                    <CardDescription>
-                      Components that need documentation.
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      {result.missingDocs.map((missing: any, index: number) => (
-                        <div key={index} className="p-2 bg-gray-50 rounded-md">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <span className="font-mono text-sm">{missing.componentId}</span>
-                              <span className="ml-2 text-xs text-gray-500">{missing.type}</span>
-                            </div>
-                            <span className="text-xs text-gray-500">
-                              {missing.location.filePath}:{missing.location.startLine}
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <Activity className="w-12 h-12 mx-auto mb-4 opacity-20" />
-              <p>No quality assessment available.</p>
-            </div>
-          )}
+          <QualityAnalysis 
+            qualityAssessment={result.qualityAssessment} 
+            missingDocs={result.missingDocs} 
+          />
         </TabsContent>
       </Tabs>
     </div>

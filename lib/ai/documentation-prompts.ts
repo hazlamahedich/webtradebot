@@ -60,7 +60,7 @@ export const documentationPrompts = {
     Return structured documentation following the required schema.
   `),
 
-  // Prompt for assessing documentation quality
+  // Enhanced prompt for assessing documentation quality
   qualityAssessmentPrompt: PromptTemplate.fromTemplate(`
     You are a documentation quality assessor tasked with evaluating and improving documentation.
     Assess the following documentation against the codebase analysis:
@@ -73,20 +73,40 @@ export const documentationPrompts = {
 
     Provide a comprehensive quality assessment considering:
     1. Overall documentation coverage (0-100)
+       - Are all components documented?
+       - Are all important features covered?
+       - Are there any significant gaps in coverage?
+    
     2. Clarity of explanations (0-100)
+       - Is the documentation easy to understand?
+       - Are technical concepts explained appropriately for the audience?
+       - Are there confusing explanations that need improvement?
+    
     3. Completeness of component documentation (0-100)
+       - Do components have all necessary sections (purpose, parameters, returns, examples)?
+       - Are edge cases and limitations documented?
+       - Are usage patterns clearly explained?
+    
     4. Consistency of documentation style (0-100)
+       - Is terminology used consistently?
+       - Is the format and structure consistent?
+       - Is the tone and level of detail consistent?
+    
     5. Overall quality score (0-100)
+       - A weighted average considering all factors
+       - Emphasize coverage and completeness more heavily
 
     For each component with suboptimal documentation, provide:
-    - Specific improvement suggestions
-    - Priority level (high/medium/low)
-    - Rationale for the suggestion
+    - Specific improvement suggestions with examples
+    - Priority level (high/medium/low) with justification
+    - Rationale for why this improvement matters to developers
+
+    Be specific in your feedback - instead of "needs better examples," say "Add examples showing error handling for network failures."
 
     Return a structured quality assessment following the required schema.
   `),
 
-  // Prompt for identifying missing documentation
+  // Enhanced prompt for identifying missing documentation
   missingDocsPrompt: PromptTemplate.fromTemplate(`
     You are a documentation gap analyzer identifying areas where documentation is missing or insufficient.
     Compare the following documentation against the codebase analysis:
@@ -97,18 +117,30 @@ export const documentationPrompts = {
     Analysis:
     {analysis}
 
-    Identify:
+    Perform a thorough gap analysis with these criteria:
     1. Components completely missing documentation
+       - Identify components that exist in the code but have no documentation
+       - Prioritize components that are public-facing or widely used
+    
     2. Components with incomplete documentation
-    3. High-priority areas that should be documented first
-    4. Relationships that need better explanation
+       - Identify components with partial documentation that's missing crucial information
+       - Focus on missing parameters, return values, or usage examples
+    
+    3. High-priority documentation gaps
+       - Identify gaps that would most impact a developer using this code
+       - Consider API endpoints, core classes/functions, and error handling
+    
+    4. Relationships and integration points
+       - Identify connections between components that need better explanation
+       - Focus on how components should be composed or used together
 
     For each gap, provide:
     - The specific component or area missing documentation
-    - The impact of this missing documentation
-    - A template or outline for what should be added
+    - The impact of this missing documentation on developers
+    - A detailed template or outline for what should be added
+    - A severity rating (critical, high, medium, low) based on developer impact
 
-    Return a structured list of documentation gaps.
+    Return a structured list of documentation gaps following the required schema.
   `),
 
   // Prompt for generating architectural diagrams
