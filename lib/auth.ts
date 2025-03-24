@@ -1,12 +1,178 @@
 import NextAuth from "next-auth";
-import GitHub from "next-auth/providers/github";
-import { createClient } from "@/lib/supabase/client";
-import { Session } from "next-auth";
+import GitHub, { GithubProfile } from "next-auth/providers/github";
 import { db } from "@/lib/supabase/db";
-import { users, accounts, repositories } from "@/lib/supabase/schema";
-import { eq, sql } from "drizzle-orm";
+import { users, accounts } from "@/lib/supabase/schema";
+import { eq, and } from "drizzle-orm";
 
-// Extend the Session type to include accessToken
+// Define auth configuration for Next.js 15 compatibility
+export const { 
+  handlers: { GET, POST },
+  auth, 
+  signIn, 
+  signOut 
+} = NextAuth({
+  providers: [
+    GitHub({
+      clientId: process.env.GITHUB_ID!,
+      clientSecret: process.env.GITHUB_SECRET!,
+      authorization: {
+        params: {
+          scope: 'read:user user:email repo',
+        },
+      },
+    }),
+  ],
+  
+  session: {
+    strategy: "jwt",
+  },
+  
+  pages: {
+    signIn: '/auth/signin',
+    error: '/auth/error',
+  },
+  
+  callbacks: {
+    // Add token data during JWT creation
+    async jwt({ token, account, profile }) {
+      if (account?.provider === 'github' && profile) {
+        // Cast to GitHub profile to access properties
+        const githubProfile = profile as GithubProfile;
+        
+        // Store GitHub information in the token
+        token.gitHubId = githubProfile.id;
+        token.gitHubLogin = githubProfile.login;
+        token.sub = String(githubProfile.id); // Use GitHub ID consistently as user ID
+        token.accessToken = account.access_token;
+        
+        // Try to save GitHub account information to database
+        try {
+          await saveGitHubAccount(
+            token.sub,
+            account.access_token!,
+            account.refresh_token,
+            account.expires_at ? account.expires_at * 1000 : undefined
+          );
+        } catch (error) {
+          console.error("Auth error saving GitHub account:", error);
+        }
+      }
+      return token;
+    },
+
+    // Create session from token data
+    async session({ session, token }) {
+      if (token.sub && session.user) {
+        // Add the GitHub ID as the user ID to the session
+        session.user.id = token.sub;
+        
+        // Add access token if available
+        if (token.accessToken) {
+          session.accessToken = token.accessToken as string;
+        }
+        
+        // Try to check user in database but don't block auth if it fails
+        try {
+          await checkOrCreateUser(token);
+        } catch (error) {
+          console.error("Database error:", error);
+        }
+      }
+      return session;
+    },
+  },
+});
+
+// Helper function to save GitHub account info
+async function saveGitHubAccount(
+  userId: string,
+  accessToken: string,
+  refreshToken?: string,
+  expiresAt?: number
+) {
+  try {
+    // Check if account exists
+    const existingAccount = await db
+      .select()
+      .from(accounts)
+      .where(
+        and(
+          eq(accounts.userId, userId),
+          eq(accounts.provider, "github")
+        )
+      )
+      .limit(1);
+    
+    if (existingAccount.length > 0) {
+      // Update existing account
+      await db
+        .update(accounts)
+        .set({
+          accessToken,
+          refreshToken,
+          expiresAt: expiresAt ? Math.floor(expiresAt / 1000) : undefined,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(accounts.userId, userId),
+            eq(accounts.provider, "github")
+          )
+        );
+    } else {
+      // Create new account
+      await db
+        .insert(accounts)
+        .values({
+          userId,
+          type: "oauth",
+          provider: "github",
+          providerAccountId: userId,
+          accessToken,
+          refreshToken,
+          expiresAt: expiresAt ? Math.floor(expiresAt / 1000) : undefined,
+          tokenType: "bearer",
+          scope: "read:user,user:email,repo",
+        });
+    }
+  } catch (error) {
+    console.error("Database error saving account:", error);
+    throw error;
+  }
+}
+
+// Check if a user exists in the database or create them
+async function checkOrCreateUser(token: any) {
+  try {
+    const userId = token.sub.toString();
+    
+    // Check if user exists
+    const existingUser = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+    
+    if (existingUser.length === 0) {
+      // Create the user if they don't exist
+      await db.insert(users).values({
+        id: userId,
+        name: token.name,
+        email: token.email,
+        image: token.picture,
+        gitHubId: token.gitHubId,
+        gitHubLogin: token.gitHubLogin,
+      });
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error checking/creating user:", error);
+    return false;
+  }
+}
+
+// Type definitions
 declare module "next-auth" {
   interface Session {
     accessToken?: string;
@@ -17,225 +183,4 @@ declare module "next-auth" {
       image?: string | null;
     };
   }
-}
-
-export const { handlers, auth, signIn, signOut } = NextAuth({
-  providers: [
-    GitHub({
-      clientId: process.env.GITHUB_ID as string,
-      clientSecret: process.env.GITHUB_SECRET as string,
-      authorization: {
-        url: "https://github.com/login/oauth/authorize",
-        params: {
-          scope: "read:user user:email repo",
-        },
-      },
-    }),
-  ],
-  callbacks: {
-    async session({ session, token }) {
-      console.log('Auth - Session callback - token.sub:', token.sub);
-      console.log('Auth - Session callback - session before:', JSON.stringify(session, null, 2));
-      
-      if (token.sub && session.user) {
-        // Use GitHub provider account ID as the consistent user ID 
-        // This ensures the same user ID across sessions
-        session.user.id = token.sub;
-        
-        // Verify if user exists in database
-        const dbUser = await db
-          .select()
-          .from(users)
-          .where(eq(users.id, token.sub))
-          .limit(1);
-        
-        console.log('Auth - User in database:', dbUser.length ? 'Yes' : 'No');
-        if (dbUser.length) {
-          console.log('Auth - Database user ID:', dbUser[0].id);
-          
-          // Check for repositories associated with UUID format IDs for this GitHub user
-          await migrateUserRepositories(dbUser[0].name, token.sub);
-        } else {
-          // Create user if not exists
-          console.log('Auth - Creating new user with ID:', token.sub);
-          try {
-            await db.insert(users).values({
-              id: token.sub,
-              name: session.user.name || '',
-              email: session.user.email || '',
-              image: session.user.image || null
-            });
-            console.log('Auth - User created successfully');
-            
-            // Also check for repositories to migrate
-            if (session.user.name) {
-              await migrateUserRepositories(session.user.name, token.sub);
-            }
-          } catch (error) {
-            console.error('Auth - Error creating user:', error);
-          }
-        }
-      }
-      
-      if (token.accessToken) {
-        session.accessToken = token.accessToken as string;
-      }
-      
-      console.log('Auth - Session callback - session after:', JSON.stringify(session, null, 2));
-      return session;
-    },
-    async jwt({ token, account, profile, user }) {
-      console.log('Auth - JWT callback - token before:', JSON.stringify(token, null, 2));
-      
-      if (account && profile) {
-        console.log('Auth - JWT callback - account provider:', account.provider);
-        console.log('Auth - JWT callback - GitHub user ID:', profile.id);
-        
-        // Use GitHub ID consistently for the user ID
-        if (profile.id) {
-          token.sub = profile.id as string;
-        }
-        
-        token.accessToken = account.access_token;
-        
-        // Save the GitHub account information in the database
-        try {
-          console.log('Auth - Saving GitHub account information');
-          
-          // Check if account already exists
-          const existingAccount = await db
-            .select()
-            .from(accounts)
-            .where(
-              sql`${accounts.provider} = ${account.provider} AND ${accounts.providerAccountId} = ${account.providerAccountId}`
-            )
-            .limit(1);
-            
-          if (existingAccount.length === 0) {
-            try {
-              // Insert new account
-              await db.execute(sql`
-                INSERT INTO accounts (
-                  user_id, 
-                  type, 
-                  provider, 
-                  provider_account_id, 
-                  refresh_token, 
-                  access_token, 
-                  expires_at, 
-                  token_type, 
-                  scope, 
-                  id_token, 
-                  session_state
-                ) VALUES (
-                  ${token.sub}, 
-                  ${account.type}, 
-                  ${account.provider}, 
-                  ${account.providerAccountId}, 
-                  ${account.refresh_token || null}, 
-                  ${account.access_token || null}, 
-                  ${account.expires_at || null}, 
-                  ${account.token_type || null}, 
-                  ${account.scope || null}, 
-                  ${account.id_token || null}, 
-                  ${account.session_state || null}
-                )
-              `);
-              console.log('Auth - GitHub account information saved successfully');
-            } catch (error) {
-              console.error('Auth - Error executing SQL to save account:', error);
-            }
-          } else {
-            try {
-              // Update existing account
-              await db.execute(sql`
-                UPDATE accounts 
-                SET 
-                  access_token = ${account.access_token || null}, 
-                  refresh_token = ${account.refresh_token || null}, 
-                  expires_at = ${account.expires_at || null}
-                WHERE 
-                  provider = ${account.provider} AND 
-                  provider_account_id = ${account.providerAccountId}
-              `);
-              console.log('Auth - GitHub account information updated successfully');
-            } catch (error) {
-              console.error('Auth - Error executing SQL to update account:', error);
-            }
-          }
-        } catch (error) {
-          console.error('Auth - Error saving GitHub account information:', error);
-        }
-      }
-      
-      console.log('Auth - JWT callback - token after:', JSON.stringify(token, null, 2));
-      return token;
-    },
-  },
-  pages: {
-    signIn: "/auth/signin",
-    error: "/auth/error",
-  },
-  session: {
-    strategy: "jwt",
-  },
-});
-
-// Function to migrate repositories from UUID to GitHub ID
-async function migrateUserRepositories(username: string, githubId: string) {
-  try {
-    console.log(`Auth - Checking for repositories to migrate for user ${username} (GitHub ID: ${githubId})`);
-    
-    // Find all repositories created by this user's GitHub username but linked to a different user ID
-    const reposToMigrate = await db
-      .select()
-      .from(repositories)
-      .where(
-        sql`LOWER(${repositories.owner}) = LOWER(${username}) AND ${repositories.userId} != ${githubId}`
-      );
-      
-    if (reposToMigrate.length > 0) {
-      console.log(`Auth - Found ${reposToMigrate.length} repositories to migrate to GitHub ID ${githubId}`);
-      
-      // Update all repositories to use the GitHub ID
-      for (const repo of reposToMigrate) {
-        console.log(`Auth - Migrating repository ${repo.fullName} from user ID ${repo.userId} to ${githubId}`);
-        
-        await db
-          .update(repositories)
-          .set({ userId: githubId })
-          .where(eq(repositories.id, repo.id));
-      }
-      
-      console.log(`Auth - Successfully migrated ${reposToMigrate.length} repositories to GitHub ID ${githubId}`);
-    } else {
-      console.log(`Auth - No repositories found to migrate for user ${username}`);
-    }
-  } catch (error) {
-    console.error('Auth - Error migrating user repositories:', error);
-  }
-}
-
-// Supabase user session management
-export const updateUserSession = async (userId: string, sessionData: any) => {
-  console.log('Auth - Updating user session for ID:', userId);
-  const supabase = createClient();
-  
-  try {
-    const { error } = await supabase
-      .from("user_sessions")
-      .upsert({
-        user_id: userId,
-        session_data: sessionData,
-        last_updated: new Date().toISOString(),
-      })
-      .select();
-      
-    if (error) throw error;
-    console.log('Auth - User session updated successfully');
-    return true;
-  } catch (error) {
-    console.error("Error updating user session:", error);
-    return false;
-  }
-}; 
+} 

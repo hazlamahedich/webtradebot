@@ -1,76 +1,104 @@
-import { NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
-import { db } from '@/lib/supabase/db';
-import { users, accounts } from '@/lib/supabase/schema';
-import { eq, sql } from 'drizzle-orm';
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/supabase/db";
+import { users, accounts } from "@/lib/supabase/schema";
+import { eq } from "drizzle-orm";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    // Get current session
     const session = await auth();
     
-    // Get all accounts
-    const allAccounts = await db.select().from(accounts);
-    
-    // Get all users
-    const allUsers = await db.select().from(users);
-    
-    // Force account creation if user is logged in
-    let accountCreationResult = null;
-    
-    if (session?.user?.id) {
-      try {
-        const userId = session.user.id;
-        const accountExists = await db
-          .select()
-          .from(accounts)
-          .where(eq(accounts.userId, userId))
-          .limit(1);
-          
-        if (accountExists.length === 0 && session.accessToken) {
-          // Create account for user
-          accountCreationResult = await db.execute(sql`
-            INSERT INTO accounts (
-              user_id,
-              type,
-              provider,
-              provider_account_id,
-              access_token
-            ) VALUES (
-              ${userId},
-              'oauth',
-              'github',
-              ${userId},
-              ${session.accessToken}
-            )
-          `);
-        }
-      } catch (error) {
-        accountCreationResult = {
-          error: error instanceof Error ? error.message : 'Unknown error'
-        };
-      }
+    // Check if user is authenticated
+    if (!session || !session.user) {
+      return NextResponse.json(
+        { 
+          status: "unauthenticated", 
+          authVersion: "NextAuth.js 4",
+          nextVersion: "Next.js 15",
+          userId: null,
+          error: "No active session found" 
+        },
+        { status: 401 }
+      );
     }
     
-    // Return debug information
-    return NextResponse.json({
+    const userId = session.user.id;
+    let dbUserData = null;
+    let dbAccountData = null;
+    
+    // Try to get user data from database
+    try {
+      const dbUser = await db
+        .select()
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1);
+      
+      if (dbUser.length > 0) {
+        dbUserData = {
+          id: dbUser[0].id,
+          name: dbUser[0].name,
+          email: dbUser[0].email,
+          gitHubId: dbUser[0].gitHubId,
+          gitHubLogin: dbUser[0].gitHubLogin,
+        };
+      }
+      
+      // Try to get account data from database
+      const dbAccount = await db
+        .select()
+        .from(accounts)
+        .where(eq(accounts.userId, userId))
+        .limit(1);
+      
+      if (dbAccount.length > 0) {
+        dbAccountData = {
+          provider: dbAccount[0].provider,
+          providerAccountId: dbAccount[0].providerAccountId,
+          hasAccessToken: Boolean(dbAccount[0].accessToken),
+          hasRefreshToken: Boolean(dbAccount[0].refreshToken),
+          expiresAt: dbAccount[0].expiresAt,
+          tokenType: dbAccount[0].tokenType,
+          scope: dbAccount[0].scope,
+        };
+      }
+    } catch (error) {
+      console.error("Error getting user/account data:", error);
+    }
+    
+    // Create diagnostics
+    const diagnostics = {
+      authState: "authenticated",
       session: {
-        user: session?.user,
-        hasAccessToken: !!session?.accessToken,
+        userId: session.user.id,
+        userName: session.user.name,
+        userEmail: session.user.email,
+        hasAccessToken: Boolean(session.accessToken),
       },
-      accounts: {
-        count: allAccounts.length,
-        data: allAccounts,
+      database: {
+        userFound: Boolean(dbUserData),
+        userData: dbUserData,
+        accountFound: Boolean(dbAccountData),
+        accountData: dbAccountData,
       },
-      users: {
-        count: allUsers.length,
-        data: allUsers,
+      environment: {
+        nodeEnv: process.env.NODE_ENV,
+        nextAuth: process.env.NEXTAUTH_URL || "Not set",
+        githubIdSet: Boolean(process.env.GITHUB_ID),
+        githubSecretSet: Boolean(process.env.GITHUB_SECRET),
       },
-      accountCreationResult,
-    });
+    };
+    
+    return NextResponse.json(diagnostics);
   } catch (error) {
-    return NextResponse.json({
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 });
+    console.error("Auth debug error:", error);
+    return NextResponse.json(
+      { 
+        status: "error", 
+        message: "Error getting authentication information",
+        error: error instanceof Error ? error.message : String(error)
+      },
+      { status: 500 }
+    );
   }
 } 

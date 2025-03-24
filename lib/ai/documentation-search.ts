@@ -1,8 +1,8 @@
 import { db } from "@/lib/supabase/db";
 import { Documentation, DocumentationDiagram } from "./types";
 import { edgeCodeAnalysisModel } from "./models";
-import { eq } from "drizzle-orm";
-import { documentationRequests } from "@/lib/supabase/schema";
+import { eq, and, gte, lte, sql } from "drizzle-orm";
+import { documentationRequests, repositories } from "@/lib/supabase/schema";
 
 /**
  * Interface for search parameters
@@ -71,41 +71,49 @@ export async function searchDocumentation(
   params: DocSearchParams
 ): Promise<DocSearchResult[]> {
   try {
-    // Start with a basic SQL query
+    // Extract search parameters
     const { query, repositoryId, userId, tags, componentTypes, dateFrom, dateTo, limit = 10, offset = 0 } = params;
     
-    // First do a basic database search
-    let dbQuery = db
-      .select({
-        dr: 'documentation_requests.*',
-        r: 'repositories.name as repository_name',
-      })
-      .from('documentation_requests as dr')
-      .leftJoin('repositories as r', 'dr.repository_id', 'r.id')
-      .where('dr.status', '=', 'completed')
-      .limit(limit)
-      .offset(offset)
-      .orderBy('dr.updated_at', 'desc');
+    // Build query conditions
+    const whereConditions = [];
+    
+    // Add base condition for completed docs
+    whereConditions.push(eq(documentationRequests.status, 'completed'));
     
     // Add filters
     if (repositoryId) {
-      dbQuery = dbQuery.where('dr.repository_id', '=', repositoryId);
+      whereConditions.push(eq(documentationRequests.repository_id, repositoryId));
     }
     
     if (userId) {
-      dbQuery = dbQuery.where('dr.user_id', '=', userId);
+      whereConditions.push(eq(documentationRequests.user_id, userId));
     }
     
     if (dateFrom) {
-      dbQuery = dbQuery.where('dr.created_at', '>=', dateFrom);
+      whereConditions.push(gte(documentationRequests.created_at, new Date(dateFrom)));
     }
     
     if (dateTo) {
-      dbQuery = dbQuery.where('dr.created_at', '<=', dateTo);
+      whereConditions.push(lte(documentationRequests.created_at, new Date(dateTo)));
     }
     
-    // Execute the query
-    const rawResults = await dbQuery;
+    // Execute the query using the proper Drizzle syntax
+    const rawResults = await db
+      .select({
+        id: documentationRequests.id,
+        repository_id: documentationRequests.repository_id,
+        result: documentationRequests.result,
+        created_at: documentationRequests.created_at,
+        updated_at: documentationRequests.created_at, // Using created_at as a fallback since there's no updated_at
+        pull_request_id: sql<string>`null`, // Pull request ID is not directly available
+        repository_name: repositories.name,
+      })
+      .from(documentationRequests)
+      .leftJoin(repositories, eq(documentationRequests.repository_id, repositories.id))
+      .where(and(...whereConditions))
+      .limit(limit)
+      .offset(offset)
+      .orderBy(documentationRequests.created_at);
     
     if (rawResults.length === 0) {
       return [];
@@ -114,16 +122,16 @@ export async function searchDocumentation(
     // Get documentation content from results
     const documentations = rawResults.map(row => {
       try {
-        const result = JSON.parse(row.dr.result || '{}');
+        const parsedResult = row.result ? JSON.parse(row.result.toString()) : {};
         return {
-          documentationId: row.dr.id,
-          repositoryId: row.dr.repository_id,
-          repositoryName: row.repository_name,
-          documentation: result.documentation,
-          diagrams: result.diagrams,
-          createdAt: row.dr.created_at,
-          updatedAt: row.dr.updated_at,
-          pullRequestId: row.dr.pull_request_id || undefined,
+          documentationId: row.id,
+          repositoryId: row.repository_id,
+          repositoryName: row.repository_name || row.repository_id, // Fallback to ID if name not available
+          documentation: parsedResult.documentation,
+          diagrams: parsedResult.diagrams,
+          createdAt: row.created_at?.toISOString() || new Date().toISOString(),
+          updatedAt: row.updated_at?.toISOString() || new Date().toISOString(),
+          pullRequestId: row.pull_request_id,
         };
       } catch (e) {
         return null;
@@ -170,18 +178,18 @@ async function semanticSearch(
       let searchableText = '';
       
       // Add overview
-      if (docContent.overview) {
+      if (docContent?.overview) {
         searchableText += docContent.overview + '\n\n';
       }
       
       // Add architecture
-      if (docContent.architecture) {
+      if (docContent?.architecture) {
         searchableText += docContent.architecture + '\n\n';
       }
       
       // Add components
-      if (docContent.components && docContent.components.length > 0) {
-        docContent.components.forEach(component => {
+      if (docContent?.components && docContent.components.length > 0) {
+        docContent.components.forEach((component: any) => {
           searchableText += `Component: ${component.componentId}\n`;
           searchableText += `${component.description}\n`;
           searchableText += `Usage: ${component.usage || 'N/A'}\n\n`;
@@ -189,14 +197,14 @@ async function semanticSearch(
       }
       
       // Add usage guide
-      if (docContent.usageGuide) {
+      if (docContent?.usageGuide) {
         searchableText += docContent.usageGuide + '\n\n';
       }
       
       return {
         ...doc,
         searchableText,
-        components: docContent.components || [],
+        components: docContent?.components || [],
       };
     });
     
@@ -231,11 +239,20 @@ async function semanticSearch(
         // Parse the JSON response
         let relevanceData;
         try {
-          // Try to extract JSON from the response
-          const jsonMatch = relevanceResponse.match(/```json\n([\s\S]*?)\n```/) ||
-                           relevanceResponse.match(/\{[\s\S]*\}/);
+          // Extract the content string from the AI response
+          const responseText = typeof relevanceResponse === 'string' 
+            ? relevanceResponse 
+            : 'content' in relevanceResponse 
+              ? typeof relevanceResponse.content === 'string' 
+                ? relevanceResponse.content 
+                : JSON.stringify(relevanceResponse.content)
+              : JSON.stringify(relevanceResponse);
+          
+          // Try to extract JSON from the response text
+          const jsonMatch = responseText.match(/```json\n([\s\S]*?)\n```/) ||
+                           responseText.match(/\{[\s\S]*\}/);
                            
-          const jsonString = jsonMatch ? jsonMatch[1] || jsonMatch[0] : relevanceResponse;
+          const jsonString = jsonMatch ? jsonMatch[1] || jsonMatch[0] : responseText;
           relevanceData = JSON.parse(jsonString);
         } catch (e) {
           console.error("Error parsing relevance data:", e);
@@ -254,16 +271,16 @@ async function semanticSearch(
           matchedContext: relevanceData.matchedContext || doc.documentation?.overview?.substring(0, 200) + '...' || '',
           pullRequestId: doc.pullRequestId,
         };
-      } catch (e) {
-        console.error("Error ranking documentation:", e);
+      } catch (error) {
+        console.error("Error in semantic search processing:", error);
         return null;
       }
     }));
     
-    // Filter out failures and sort by relevance
+    // Filter out any null results and sort by relevance
     return searchResults
       .filter(Boolean)
-      .sort((a, b) => b.relevance - a.relevance);
+      .sort((a, b) => (b?.relevance || 0) - (a?.relevance || 0));
   } catch (error) {
     console.error("Error in semantic search:", error);
     return [];
@@ -271,53 +288,83 @@ async function semanticSearch(
 }
 
 /**
- * Suggest related documentation based on current documentation
+ * Gets documentation suggestions based on similarity to a given documentation
  */
 export async function getSuggestedDocumentation(
   documentationId: string,
   limit: number = 5
 ): Promise<DocSearchResult[]> {
   try {
-    // Get the current documentation
-    const { db } = await import("@/lib/supabase/db");
-    const docResult = await db
-      .select('*')
-      .from('documentation_requests')
-      .where({ id: documentationId })
-      .single();
+    // Get the documentation to find similar ones
+    const docRequest = await db.select()
+      .from(documentationRequests)
+      .where(eq(documentationRequests.id, documentationId))
+      .limit(1);
     
-    if (!docResult || !docResult.result) {
+    if (docRequest.length === 0) {
       return [];
     }
     
-    const parsedResult = JSON.parse(docResult.result);
+    const docData = docRequest[0];
     
-    // Create a query based on key concepts from the documentation
-    const documentation = parsedResult.documentation;
-    
-    if (!documentation || !documentation.overview) {
+    if (!docData.result) {
       return [];
     }
     
-    // Extract key terms from the documentation overview
-    const overviewText = documentation.overview;
-    const componentNames = (documentation.components || [])
-      .map(c => c.componentId)
-      .join(', ');
+    // Parse the content
+    const docResult = JSON.parse(docData.result.toString());
+    const docContent = docResult.documentation;
     
-    // Create a search query from the overview and component names
-    const searchQuery = `${overviewText.split('.')[0]}. Components: ${componentNames}`;
+    if (!docContent) {
+      return [];
+    }
     
-    // Search for related documentation
-    const results = await searchDocumentation({
-      query: searchQuery,
-      limit,
-      offset: 0,
-      repositoryId: docResult.repository_id,
-    });
+    // Get other documentation for the same repository
+    const repoId = docData.repository_id;
+    
+    // Query for other documentation from the same repository
+    const otherDocs = await db.select({
+        id: documentationRequests.id,
+        repository_id: documentationRequests.repository_id,
+        result: documentationRequests.result,
+        created_at: documentationRequests.created_at,
+        pull_request_id: sql<string>`null`, // Null as a placeholder
+        repository_name: repositories.name,
+      })
+      .from(documentationRequests)
+      .leftJoin(repositories, eq(documentationRequests.repository_id, repositories.id))
+      .where(and(
+        eq(documentationRequests.status, 'completed'),
+        eq(documentationRequests.repository_id, repoId)
+      ))
+      .limit(limit + 1); // Get one extra to exclude current doc
     
     // Filter out the current documentation
-    return results.filter(result => result.documentationId !== documentationId);
+    const filteredDocs = otherDocs.filter(doc => doc.id !== documentationId);
+    
+    // Map to proper format
+    return filteredDocs.slice(0, limit).map(doc => {
+      try {
+        const result = doc.result ? JSON.parse(doc.result.toString()) : {};
+        const docContent = result.documentation || {};
+        
+        return {
+          documentationId: doc.id || '',
+          repositoryId: doc.repository_id || '',
+          repositoryName: doc.repository_name || doc.repository_id || '',
+          title: docContent.overview?.split('\n')[0] || 'Untitled Documentation',
+          relevance: 1, // Default relevance
+          createdAt: doc.created_at?.toISOString() || new Date().toISOString(),
+          updatedAt: doc.created_at?.toISOString() || new Date().toISOString(),
+          matchedComponents: [],
+          matchedContext: docContent.overview?.substring(0, 200) + '...' || '',
+          pullRequestId: doc.pull_request_id,
+        };
+      } catch (e) {
+        console.error("Error processing doc:", e);
+        return null;
+      }
+    }).filter(Boolean);
   } catch (error) {
     console.error("Error getting suggested documentation:", error);
     return [];

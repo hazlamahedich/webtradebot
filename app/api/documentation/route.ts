@@ -3,6 +3,8 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/supabase/db";
 import { startDocumentationGeneration } from "@/lib/ai/documentation-generator";
 import { GitHubClient } from "@/lib/github/api";
+import { documentationRequests } from "@/lib/supabase/schema";
+import { eq, desc } from "drizzle-orm";
 
 // Remove Edge Runtime configuration to be compatible with Vercel free tier
 // export const runtime = 'edge';
@@ -34,16 +36,16 @@ export async function POST(request: Request) {
     const documentationId = `doc_${Date.now()}`;
 
     // Store the documentation request in the database
-    await db.insert({
+    await db.insert(documentationRequests).values({
       id: documentationId,
       repository_id: repositoryId,
       owner,
       repo,
       branch,
       status: "processing",
-      created_at: new Date().toISOString(),
+      created_at: new Date(),
       user_id: session.user.id,
-    }).into("documentation_requests");
+    });
 
     // Start documentation generation process asynchronously
     // We'll use a background process pattern via webhooks
@@ -93,18 +95,18 @@ export async function GET(request: Request) {
     if (id) {
       const documentation = await db
         .select()
-        .from("documentation_requests")
-        .where({ id })
-        .first();
+        .from(documentationRequests)
+        .where(eq(documentationRequests.id, id))
+        .limit(1);
 
-      if (!documentation) {
+      if (!documentation.length) {
         return NextResponse.json(
           { error: "Documentation not found" },
           { status: 404 }
         );
       }
 
-      return NextResponse.json(documentation);
+      return NextResponse.json(documentation[0]);
     }
 
     // If owner and repo are provided, get documentation for a repository
@@ -112,9 +114,9 @@ export async function GET(request: Request) {
       const repositoryId = `${owner}/${repo}`;
       const documentations = await db
         .select()
-        .from("documentation_requests")
-        .where({ repository_id: repositoryId })
-        .orderBy("created_at", "desc");
+        .from(documentationRequests)
+        .where(eq(documentationRequests.repository_id, repositoryId))
+        .orderBy(desc(documentationRequests.created_at));
 
       return NextResponse.json(documentations);
     }
@@ -122,9 +124,9 @@ export async function GET(request: Request) {
     // Get all documentation requests for the user
     const documentations = await db
       .select()
-      .from("documentation_requests")
-      .where({ user_id: session.user.id })
-      .orderBy("created_at", "desc");
+      .from(documentationRequests)
+      .where(eq(documentationRequests.user_id, session.user.id))
+      .orderBy(desc(documentationRequests.created_at));
 
     return NextResponse.json(documentations);
   } catch (error) {

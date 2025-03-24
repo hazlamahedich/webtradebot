@@ -1,17 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Enable SWC compiler explicitly
-  swcMinify: true,
-  // Disable edge runtime for middleware to avoid PostgreSQL connection issues
+  
+  // External packages that should be transpiled for Node.js
+  serverExternalPackages: ['@prisma/client', 'bcryptjs'],
+  
+  // Experimental features
   experimental: {
-    // Ensure middleware uses Node.js runtime
-    instrumentationHook: true,
     // Force SWC for font handling even with Babel config
     forceSwcTransforms: true
   },
+  
   // Skip middleware url normalization
   skipMiddlewareUrlNormalize: true,
+  
   // Ensure backend API routes are handled properly
   async headers() {
     return [
@@ -26,6 +28,8 @@ const nextConfig = {
       },
     ];
   },
+  
+  // Fix webpack polyfills for Node.js modules
   webpack: (config) => {
     config.resolve.fallback = {
       ...config.resolve.fallback,
