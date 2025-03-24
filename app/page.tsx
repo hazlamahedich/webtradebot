@@ -8,189 +8,193 @@ import { ThemeToggle } from "@/components/ui/theme-toggle";
 export default function HomePage() {
   return (
     <div className="flex min-h-screen flex-col">
-      <div className="fixed top-0 right-0 m-4 z-50">
-        <Link href="/auth/fallback" className="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 text-sm font-medium">
-          Emergency Sign In
-        </Link>
-      </div>
       <header className="sticky top-0 z-10 border-b bg-background/80 backdrop-blur-md">
         <div className="container flex h-16 items-center justify-between py-4">
           <div className="flex items-center gap-2">
             <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-600">iDocument</span>
           </div>
-          <nav className="flex items-center gap-4">
-            <Link href="/auth/direct-login" className="text-sm font-medium hover:text-primary transition-colors">
-              Documentation
-            </Link>
-            <Link href="/auth/direct-login" className="text-sm font-medium hover:text-primary transition-colors">
-              Features
-            </Link>
+          <div className="flex items-center gap-4">
             <ThemeToggle />
-            <Link href="/auth/direct-login">
-              <Button variant="ghost" className="hover:bg-primary/10">Sign In</Button>
-            </Link>
-            <Link href="/auth/signin">
-              <Button className="relative group overflow-hidden shadow-lg">
-                <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-indigo-500 to-purple-600 group-hover:from-purple-600 group-hover:to-indigo-500 transition-all duration-500"></span>
-                <span className="relative flex items-center">
-                  Get Started <ArrowRight className="ml-1.5 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                </span>
-              </Button>
-            </Link>
-          </nav>
+            <Button asChild variant="default" size="sm">
+              <Link href="/auth/signin" className="flex items-center gap-2">
+                <Github className="h-4 w-4" />
+                <span>Sign In</span>
+              </Link>
+            </Button>
+          </div>
         </div>
       </header>
       <main className="flex-1">
-        <div className="container mx-auto px-4 py-6">
-          <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-8 rounded shadow-sm">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-bold">Authentication System Notice</p>
-                <p className="text-sm">The regular sign-in system is experiencing issues. Please use the direct GitHub sign-in.</p>
-              </div>
-              <Link href="/auth/direct-login">
-                <Button className="bg-yellow-500 hover:bg-yellow-600 text-white">
-                  Direct GitHub Sign In
-                </Button>
-              </Link>
-            </div>
-          </div>
-          
-          <section className="container grid items-center gap-8 pt-24 pb-16 md:pt-32 md:pb-24">
-            <div className="flex flex-col items-center gap-6 text-center animate-fade-in">
-              <span className="inline-flex items-center rounded-full bg-muted px-3 py-1 text-sm">
-                <span className="mr-1 h-2 w-2 rounded-full bg-green-500"></span>
-                Now in Public Beta
-              </span>
-              <h1 className="text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl lg:text-7xl bg-clip-text text-transparent bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-400">
-                AI-Powered Code Documentation
-              </h1>
-              <p className="max-w-[42rem] text-muted-foreground sm:text-xl md:text-2xl animate-fade-in animate-delay-100">
-                Automatically analyze code, generate comprehensive documentation, and 
-                explain complex implementations in plain English.
-              </p>
-              <div className="flex flex-wrap items-center justify-center gap-4 mt-4 animate-fade-in animate-delay-200">
-                <Link href="/auth/signin">
-                  <Button size="lg" className="h-12 px-8 relative group overflow-hidden shadow-lg">
-                    <span className="absolute inset-0 w-full h-full bg-gradient-to-r from-indigo-500 to-purple-600 group-hover:from-purple-600 group-hover:to-indigo-500 transition-all duration-500"></span>
-                    <span className="relative flex items-center font-semibold">
-                      Get Started with GitHub <Github className="ml-2 h-5 w-5" />
-                    </span>
+        <div className="container">
+          <section className="py-12 md:py-16 lg:py-20">
+            <div className="grid gap-8 md:grid-cols-2 md:gap-12">
+              <div className="flex flex-col justify-center space-y-4">
+                <div className="space-y-2">
+                  <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-purple-600">
+                    Generate Great Documentation Automatically
+                  </h1>
+                  <p className="max-w-[600px] text-gray-500 md:text-xl dark:text-gray-400">
+                    AI-powered documentation that learns from your codebase and explains how everything works.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 min-[400px]:flex-row">
+                  <Button asChild size="lg">
+                    <Link href="/auth/signin">
+                      Get Started
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Link>
                   </Button>
-                </Link>
-                <Link href="/about">
-                  <Button variant="outline" size="lg" className="h-12 px-8 border-2 hover:bg-secondary/50">
-                    <span className="flex items-center font-semibold">
-                      Live Demo <ExternalLink className="ml-2 h-4 w-4" />
-                    </span>
+                  <Button asChild size="lg" variant="outline">
+                    <Link href="#features">
+                      Learn More
+                    </Link>
                   </Button>
-                </Link>
-              </div>
-            </div>
-            
-            <div className="relative mx-auto mt-10 w-full max-w-4xl rounded-xl border border-border shadow-2xl shadow-black/5 animate-fade-in animate-delay-300">
-              <div className="rounded-t-xl bg-muted p-2">
-                <div className="flex gap-1.5">
-                  <div className="h-3 w-3 rounded-full bg-red-500"></div>
-                  <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
-                  <div className="h-3 w-3 rounded-full bg-green-500"></div>
                 </div>
               </div>
-              <div className="relative bg-black rounded-b-xl">
-                <div className="overflow-hidden rounded-b-xl">
-                  <div className="bg-gray-900 p-6 text-sm text-green-400 font-mono overflow-x-auto">
-                    <pre className="typing-effect">
-                      <code>
-                        <span className="text-blue-400">const</span> <span className="text-purple-400">generateDocs</span> = <span className="text-yellow-400">async</span> (repository) =&gt; {"{"}
-                        <br/>  <span className="text-blue-400">const</span> code = <span className="text-purple-400">await</span> repository.getCode();
-                        <br/>  <span className="text-blue-400">const</span> analysis = <span className="text-purple-400">await</span> AI.analyze(code);
-                        <br/>
-                        <br/>  <span className="text-green-400">// Generate comprehensive documentation</span>
-                        <br/>  <span className="text-blue-400">return</span> {"{"}
-                        <br/>    architecture: analysis.systemArchitecture,
-                        <br/>    components: analysis.componentBreakdown,
-                        <br/>    workflows: analysis.userFlows,
-                        <br/>    api: analysis.endpointDocumentation
-                        <br/>  {"}"};
-                        <br/>{"}"};
-                      </code>
-                    </pre>
+              <div className="flex items-center justify-center">
+                <div className="relative w-full max-w-[500px] aspect-video rounded-xl border overflow-hidden shadow-2xl animate-fade-in">
+                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 opacity-10"></div>
+                  <div className="relative p-4 bg-background/80 backdrop-blur-sm h-full">
+                    <div className="flex flex-col h-full">
+                      <div className="flex items-center mb-4">
+                        <div className="flex space-x-2">
+                          <div className="h-3 w-3 rounded-full bg-red-500"></div>
+                          <div className="h-3 w-3 rounded-full bg-yellow-500"></div>
+                          <div className="h-3 w-3 rounded-full bg-green-500"></div>
+                        </div>
+                        <div className="ml-4 text-sm font-medium">Documentation.md</div>
+                      </div>
+                      <div className="flex-1 overflow-hidden">
+                        <pre className="text-xs">
+                          <code>
+                            {`# Authentication System
+
+## Overview
+The authentication system uses NextAuth.js with GitHub OAuth provider. 
+User sessions are managed through JWT tokens with server-side validation.
+
+## Main Components
+- NextAuth.js for OAuth integration
+- JWT token-based sessions
+- Server-side session validation
+- GitHub API integration for repository access
+
+## Authentication Flow
+1. User initiates sign in
+2. GitHub OAuth flow is triggered
+3. User authorizes application on GitHub
+4. GitHub redirects back with authorization code
+5. Server exchanges code for access token
+6. User session is created with token and profile data
+7. User is redirected to dashboard
+
+## Protected Routes
+All routes except the home page and authentication pages require 
+authentication. The middleware checks for valid session tokens
+before allowing access.`}
+                          </code>
+                        </pre>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </section>
-          
-          <section className="bg-secondary/50 py-16 md:py-24">
-            <div className="container">
-              <h2 className="text-3xl font-bold text-center mb-12">Why Choose iDocument</h2>
-              <div className="grid gap-8 md:grid-cols-3">
-                <div className="flex flex-col items-center p-6 rounded-xl bg-background shadow-lg animate-fade-in-left">
-                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                    <Code className="h-6 w-6 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-bold mb-2">AI-Powered Analysis</h3>
-                  <p className="text-muted-foreground text-center">
-                    Advanced AI models understand your code at a semantic level to generate
-                    meaningful documentation.
-                  </p>
-                </div>
-                <div className="flex flex-col items-center p-6 rounded-xl bg-background shadow-lg animate-fade-in animate-delay-100">
-                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                    <CheckCircle className="h-6 w-6 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-bold mb-2">Human-Readable Docs</h3>
-                  <p className="text-muted-foreground text-center">
-                    Complex code explained in clear, natural language that
-                    anyone on your team can understand.
-                  </p>
-                </div>
-                <div className="flex flex-col items-center p-6 rounded-xl bg-background shadow-lg animate-fade-in-right">
-                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                    <Github className="h-6 w-6 text-primary" />
-                  </div>
-                  <h3 className="text-xl font-bold mb-2">GitHub Integration</h3>
-                  <p className="text-muted-foreground text-center">
-                    Seamlessly connects with your repositories for instant
-                    documentation generation and updates.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </section>
-          
-          <section className="container py-16 md:py-24">
-            <div className="grid md:grid-cols-2 gap-12 items-center">
-              <div className="animate-fade-in-left">
-                <h2 className="text-3xl font-bold mb-6">Documentation That Lives With Your Code</h2>
-                <p className="text-muted-foreground mb-8">
-                  iDocument automatically updates when your code changes, ensuring your
-                  documentation is always in sync with your implementation.
+
+          <section className="py-12 md:py-16" id="features">
+            <div className="container space-y-12">
+              <div className="space-y-4 text-center">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
+                  Key Features
+                </h2>
+                <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
+                  Everything you need to document your code effectively
                 </p>
-                <ul className="space-y-4">
-                  {[
-                    "Architecture diagrams and system overviews",
-                    "Component breakdowns with detailed explanations",
-                    "API documentation with example usage",
-                    "User flow documentation with sequence diagrams"
-                  ].map((feature, i) => (
-                    <li key={i} className="flex items-start gap-2">
-                      <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
               </div>
-              <div className="relative rounded-xl border overflow-hidden shadow-xl animate-fade-in-right">
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-600 opacity-10"></div>
-                <div className="relative p-8 bg-background/80 backdrop-blur-sm">
-                  <h4 className="text-lg font-semibold mb-4">Example Component Documentation</h4>
-                  <div className="prose prose-sm max-w-none">
-                    <h5 className="font-medium">Authentication Flow</h5>
-                    <p>The authentication system uses NextAuth.js with GitHub OAuth provider. User sessions are managed through JWT tokens with server-side validation.</p>
-                    <pre className="rounded-md bg-muted p-4 text-xs">
-                      <code>
-                        {`// Session validation middleware
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <div className="rounded-xl border p-6 shadow-sm">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-300">
+                    <Code className="h-5 w-5" />
+                  </div>
+                  <h3 className="mt-4 text-xl font-bold">Code Analysis</h3>
+                  <p className="mt-2 text-gray-500 dark:text-gray-400">
+                    AI-powered analysis of your code to understand structure, patterns, and functionality.
+                  </p>
+                </div>
+                <div className="rounded-xl border p-6 shadow-sm">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-300">
+                    <CheckCircle className="h-5 w-5" />
+                  </div>
+                  <h3 className="mt-4 text-xl font-bold">Automated Documentation</h3>
+                  <p className="mt-2 text-gray-500 dark:text-gray-400">
+                    Generate comprehensive documentation without writing a word manually.
+                  </p>
+                </div>
+                <div className="rounded-xl border p-6 shadow-sm">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900 dark:text-indigo-300">
+                    <Github className="h-5 w-5" />
+                  </div>
+                  <h3 className="mt-4 text-xl font-bold">GitHub Integration</h3>
+                  <p className="mt-2 text-gray-500 dark:text-gray-400">
+                    Connect directly to your GitHub repositories for seamless documentation updates.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="py-12 md:py-16 bg-muted/30">
+            <div className="container space-y-8">
+              <div className="space-y-4 text-center">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
+                  How It Works
+                </h2>
+                <p className="mx-auto max-w-[700px] text-gray-500 md:text-xl dark:text-gray-400">
+                  Simple process, powerful results
+                </p>
+              </div>
+              <div className="grid gap-8 md:grid-cols-2">
+                <div className="relative rounded-xl border overflow-hidden shadow-xl animate-fade-in-left">
+                  <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-600 opacity-10"></div>
+                  <div className="relative p-8 bg-background/80 backdrop-blur-sm">
+                    <h4 className="text-lg font-semibold mb-4">Connect Your Repository</h4>
+                    <ol className="space-y-4 text-gray-500 dark:text-gray-400">
+                      <li className="flex items-start gap-2">
+                        <span className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">1</span>
+                        <div>
+                          <p className="font-medium text-foreground">Sign in with GitHub</p>
+                          <p className="text-sm">Authenticate securely with your GitHub account</p>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">2</span>
+                        <div>
+                          <p className="font-medium text-foreground">Select repository</p>
+                          <p className="text-sm">Choose which repository you want to document</p>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 w-6 h-6 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">3</span>
+                        <div>
+                          <p className="font-medium text-foreground">Configure settings</p>
+                          <p className="text-sm">Choose documentation style and customize options</p>
+                        </div>
+                      </li>
+                    </ol>
+                  </div>
+                </div>
+
+                <div className="relative rounded-xl border overflow-hidden shadow-xl animate-fade-in-right">
+                  <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-600 opacity-10"></div>
+                  <div className="relative p-8 bg-background/80 backdrop-blur-sm">
+                    <h4 className="text-lg font-semibold mb-4">Example Component Documentation</h4>
+                    <div className="prose prose-sm max-w-none">
+                      <h5 className="font-medium">Authentication Flow</h5>
+                      <p>The authentication system uses NextAuth.js with GitHub OAuth provider. User sessions are managed through JWT tokens with server-side validation.</p>
+                      <pre className="rounded-md bg-muted p-4 text-xs">
+                        <code>
+                          {`// Session validation middleware
 export async function middleware(req) {
   const session = await getSession(req);
   if (!session && isProtectedRoute(req.url)) {
@@ -198,8 +202,9 @@ export async function middleware(req) {
   }
   return NextResponse.next();
 }`}
-                      </code>
-                    </pre>
+                        </code>
+                      </pre>
+                    </div>
                   </div>
                 </div>
               </div>

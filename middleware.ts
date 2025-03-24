@@ -1,60 +1,79 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-
-// Use Node.js runtime to avoid Edge compatibility issues with NextAuth
-export const runtime = 'nodejs';
+import { getToken } from 'next-auth/jwt';
 
 // Paths that don't require authentication
 const publicPaths = [
   '/',
   '/auth/signin',
-  '/auth/direct-login',
-  '/auth/test-oauth',
-  '/api/auth/callback',
+  '/auth/error',
+  '/api/auth/signin',
+  '/api/auth/callback/github',
+  '/api/auth/signout',
   '/api/debug/auth',
   '/api/debug/oauth-env',
-  '/api/fix-auth',
-  '/fix-auth',
-  '/auth/error',
 ];
 
-export function middleware(request: NextRequest) {
+// Auth middleware
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  // Always allow NextAuth routes to pass through
+  // Skip middleware for static assets and other resources
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/images') ||
+    pathname.startsWith('/favicon.ico') ||
+    pathname.includes('.')
+  ) {
+    return NextResponse.next();
+  }
+  
+  // Always allow NextAuth routes
   if (pathname.startsWith('/api/auth')) {
     return NextResponse.next();
   }
   
-  // Allow access to public paths and static assets
-  if (publicPaths.some(path => pathname === path) || 
-      pathname.includes('favicon') ||
-      pathname.includes('_next') ||
-      pathname.includes('images')) {
+  // Allow access to public paths
+  if (publicPaths.some(path => pathname === path)) {
     return NextResponse.next();
   }
   
-  // Check for authentication - try both NextAuth and direct GitHub methods
-  const githubUserId = request.cookies.get('github_user_id');
-  const githubAccessToken = request.cookies.get('github_access_token');
-  
-  // First check for direct GitHub auth cookies
-  if (githubUserId && githubAccessToken) {
-    return NextResponse.next();
+  // Check authentication with NextAuth JWT
+  try {
+    const token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET
+    });
+    
+    if (token) {
+      return NextResponse.next();
+    }
+    
+    // Also check for direct GitHub cookies as fallback
+    const hasGitHubAuth = 
+      request.cookies.has('github_user_id') && 
+      request.cookies.has('github_access_token');
+    
+    if (hasGitHubAuth) {
+      return NextResponse.next();
+    }
+  } catch (error) {
+    console.error('Auth middleware error:', error);
   }
   
-  // Then check for NextAuth session cookie
-  const hasNextAuthSession = request.cookies.has('next-auth.session-token') || 
-                            request.cookies.has('__Secure-next-auth.session-token');
-  
-  if (hasNextAuthSession) {
-    return NextResponse.next();
-  }
-  
-  // If not authenticated by either method, redirect to sign-in
+  // If not authenticated, redirect to sign-in page
   return NextResponse.redirect(new URL('/auth/signin', request.url));
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|images/|favicon.ico).*)'],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - images (public image files)
+     */
+    '/((?!_next/static|_next/image|favicon.ico|images).*)',
+  ],
 }; 

@@ -366,3 +366,104 @@ export async function createCodeReviewForPR(owner: string, repo: string, pullNum
   - Documentation webhook tests
 - Test coverage artifacts are uploaded for analysis
 - Configuration uses environment variables for database and API keys
+
+# System Patterns
+
+## Authentication Architecture
+
+### NextAuth Integration
+- Using NextAuth.js with GitHub OAuth provider for authentication
+- Session management with secure HTTP-only cookies
+- Middleware for protected route access control
+- AuthProvider component for client-side session access
+
+### Session Flow
+1. User initiates sign-in via the sign-in page
+2. NextAuth redirects to GitHub OAuth login
+3. GitHub authorizes user and redirects back with authorization code
+4. NextAuth exchanges code for access token and creates session
+5. Session token stored in secure cookie
+6. User redirected to dashboard or requested protected page
+7. Middleware checks session cookie on protected routes
+8. Client components access session via useSession() hook
+
+### User Data Storage
+- Users stored in database with GitHub ID as primary identifier
+- OAuth accounts linked to users via provider ID and user ID relationship
+- GitHub access tokens stored securely for API operations
+- User profile data (name, email, image) from GitHub stored in users table
+
+### Protected Routes
+- All routes under /dashboard/* require authentication
+- Middleware automatically redirects unauthenticated users to sign-in
+- API routes check authentication status before processing requests
+- Session token validation occurs on both client and server
+
+### Error Handling
+- Failed authentication redirects to dedicated error page
+- Expired sessions trigger automatic sign-out
+- Missing GitHub connection handled with diagnostic tools
+- Clear user feedback for authentication issues
+
+## Front-End Architecture
+
+### Component Hierarchy
+- RootLayout includes Providers wrapper (ThemeProvider, AuthProvider)
+- DashboardLayout provides authenticated navigation and user profile
+- Page components handle specific functionality
+- UI components from shadcn/ui for consistent design
+
+### State Management
+- React context for theme and authentication state
+- React Query for data fetching and caching
+- Local state for UI interactions
+- Server state from server components
+
+### Styling Approach
+- Tailwind CSS for utility-first styling
+- shadcn/ui components for consistent UI elements
+- Custom components extend shadcn/ui when needed
+- Dark mode support via ThemeProvider
+
+## API Architecture
+
+### Route Structure
+- API routes under /app/api/
+- Authentication API routes under /app/api/auth/
+- Repository API routes under /app/api/repositories/
+- Documentation API routes under /app/api/documentation/
+
+### Server Actions
+- Form submissions via React Server Actions
+- Data mutations through authenticated API endpoints
+- Server-side validation for all inputs
+- Error handling with appropriate status codes
+
+## Database Architecture
+
+### Schema
+- users table for user profiles
+- accounts table for OAuth connections
+- sessions table for session management
+- repositories table for connected GitHub repositories
+- documents table for generated documentation
+
+### Relationships
+- One-to-many: User to Repositories
+- One-to-many: Repository to Documents
+- One-to-many: User to Sessions
+- One-to-many: User to Accounts
+
+## GitHub Integration
+
+### OAuth Connection
+- GitHub OAuth App for user authentication
+- Access tokens stored in accounts table
+- Refresh token flow for expired tokens
+- Scope limited to necessary operations
+
+### API Usage
+- Repository data fetched using GitHub REST API
+- Webhook events for PR notifications
+- Repository content access for documentation generation
+- Comments posting for code reviews

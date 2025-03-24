@@ -2,7 +2,7 @@ import React from 'react';
 import './globals.css';
 import { Inter } from 'next/font/google';
 import { Metadata } from 'next';
-import { ThemeProvider } from './providers';
+import { ThemeProvider, AuthProvider } from './providers';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -19,9 +19,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className} suppressHydrationWarning>
-        <ThemeProvider>
-          {children}
-        </ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider>
+            {children}
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );

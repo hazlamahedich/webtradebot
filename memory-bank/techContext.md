@@ -172,4 +172,100 @@
 - **GitHub Actions**: Automated test workflow
 - **Package Scripts**: Custom test commands in package.json
 - **Coverage Reports**: Generated with Jest's coverage options
-- **Artifact uploads**: Store test results for analysis 
+- **Artifact uploads**: Store test results for analysis
+
+## Authentication Technologies
+
+### NextAuth.js
+- Version: 5.0.0
+- Implementation: OAuth-based authentication with GitHub provider
+- File Structure:
+  - `lib/auth.ts`: Main authentication configuration
+  - `app/api/auth/[...nextauth]/route.ts`: API route handler
+  - `middleware.ts`: Authentication middleware for protected routes
+  - `app/providers.tsx`: AuthProvider for client components
+
+### Authentication Features
+- Sessions stored in HTTP-only cookies for security
+- JWT token-based authentication
+- CSRF protection built-in
+- Custom sign-in page with error handling
+- Secure redirect handling
+- User profile information display
+- Sign-out functionality with redirect
+
+### GitHub OAuth
+- OAuth 2.0 implementation
+- Required Scopes: `user:email`, `read:user`
+- Callback URL: `/api/auth/callback/github`
+- Configuration in .env:
+  - `GITHUB_ID`: GitHub OAuth app client ID
+  - `GITHUB_SECRET`: GitHub OAuth app client secret
+
+## Core Technologies
+
+### Frontend
+- Next.js 14 (App Router)
+- React 18
+- TypeScript 5
+- Tailwind CSS 3
+- shadcn/ui components
+
+### Backend
+- Next.js API Routes
+- Server Components
+- Server Actions
+
+### Database
+- Supabase PostgreSQL
+- Table Structure:
+  - users: User profiles
+  - accounts: OAuth connections
+  - sessions: User sessions
+  - repositories: GitHub repositories
+  - documents: Generated documentation
+
+### AI
+- OpenAI API (GPT-4 and GPT-3.5)
+- Anthropic Claude API
+- LangChain
+- LangGraph for workflow orchestration
+
+## Development Environment
+
+### Tools
+- Node.js 18+
+- npm 8+
+- Git
+- VS Code (recommended)
+- GitHub CLI (optional)
+
+### Local Setup
+- Environment Variables:
+  - Authentication: `NEXTAUTH_URL`, `NEXTAUTH_SECRET`, `GITHUB_ID`, `GITHUB_SECRET`
+  - Database: `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+  - AI: `OPENAI_API_KEY`
+
+### Testing
+- Jest for unit and integration tests
+- Testing utilities for authentication mocking
+
+## Deployment
+
+### Hosting
+- Vercel (production)
+- Docker (optional)
+
+### CI/CD
+- GitHub Actions
+- Automated testing pipeline
+- Environment configuration
+- Security scanning
+
+## Dependencies
+
+### Key Authentication Dependencies
+- next-auth@5.0.0
+- @vercel/postgres (for database access)
+- @auth/core
+- @auth/supabase-adapter (when using Supabase) 

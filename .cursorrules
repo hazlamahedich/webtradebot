@@ -1,5 +1,15 @@
 # iDocument Project Intelligence
 
+## Authentication Implementation
+- NextAuth v5 integrated with GitHub OAuth is the primary authentication method
+- Authentication configuration is centralized in `lib/auth.ts`
+- Session management uses JWT tokens stored in HTTP-only cookies
+- Protected routes use middleware to check authentication in `middleware.ts`
+- Client components access auth state via `useSession()` hook from next-auth/react
+- Authentication error handling uses a dedicated error page
+- User IDs from GitHub (not UUID) should be used as consistent identifiers
+- Potential issue with two user records: one with UUID, one with GitHub ID
+
 ## Project Structure
 - Using Next.js App Router for routing
 - Feature-based organization pattern
@@ -11,11 +21,6 @@
 - Functional component approach
 - Server Actions for form submissions
 - Tailwind CSS for styling with shadcn/ui components
-
-## Authentication Flow
-- NextAuth.js with GitHub OAuth provider
-- Token-based session management
-- Protected routes with middleware
 
 ## Database Pattern
 - Supabase for data storage
@@ -46,6 +51,13 @@
 - Focus on code readability in reviews
 - Actionable suggestions with inline context
 
+## Common Issues in Authentication
+- "No GitHub account connected" error occurs when the account record is missing
+- This can be fixed by using the diagnostic tool in the Connect Repository form
+- Or by logging out and logging back in with the updated auth system
+- Two user records with the same GitHub information can cause connection issues
+- Repositories may be associated with the wrong user ID (UUID vs GitHub ID)
+
 # GitHub Authentication System
 
 - NextAuth.js is used for GitHub OAuth integration
@@ -64,14 +76,6 @@
 - GitHub API calls require the user's OAuth token from accounts table
 - Repository connection diagnostics in Connect Repository form
 - Repository user association can be fixed with Fix Repositories page
-
-# Common Issues
-
-- "No GitHub account connected" error occurs when the account record is missing
-- This can be fixed by using the diagnostic tool in the Connect Repository form
-- Or by logging out and logging back in with the updated auth system
-- Two user records with the same GitHub information can cause connection issues
-- Repositories may be associated with the wrong user ID (UUID vs GitHub ID)
 
 ## AI Component Testing Pattern
 - AI tests should be isolated using Jest's isolateModules when dealing with imports

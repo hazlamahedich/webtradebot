@@ -1,59 +1,73 @@
 "use client";
 
-export const runtime = 'nodejs';
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Github, Wrench } from "lucide-react";
-import { useSearchParams } from "next/navigation";
-import Link from "next/link";
+import { Github, AlertCircle } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
 
 export default function SignIn() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
-  const nextAuthError = searchParams.get("error");
+  const errorType = searchParams.get("error");
+
+  // Handle error messages from NextAuth
+  useEffect(() => {
+    if (errorType) {
+      const errorMessages: Record<string, string> = {
+        "OAuthSignin": "Error starting the GitHub sign in process.",
+        "OAuthCallback": "Error during the GitHub callback process.",
+        "OAuthCreateAccount": "Error creating a user account.",
+        "EmailCreateAccount": "Error creating a user account.",
+        "Callback": "Error during the callback process.",
+        "OAuthAccountNotLinked": "This GitHub account is already linked to another user.",
+        "EmailSignin": "Error sending the email sign in link.",
+        "CredentialsSignin": "Sign in failed. Check your credentials.",
+        "SessionRequired": "Please sign in to access this page.",
+        "default": "An error occurred during authentication."
+      };
+
+      setError(errorMessages[errorType] || errorMessages.default);
+    }
+  }, [errorType]);
 
   const handleSignIn = async () => {
     setIsLoading(true);
     setError(null);
     
     try {
-      const result = await signIn("github", { 
+      await signIn("github", { 
         callbackUrl,
         redirect: true
       });
-      
-      if (!result?.ok) {
-        setError("Authentication failed. Please try again.");
-      }
     } catch (err) {
       console.error("Authentication error:", err);
       setError("An error occurred during authentication.");
-    } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
+    <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold">Sign In</CardTitle>
           <CardDescription>
-            Sign in to iDocument to start reviewing your code
+            Sign in with GitHub to access the application
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {(error || nextAuthError) && (
-            <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-md border border-red-200">
-              <p className="font-medium">{error || "Authentication error"}</p>
-              <p className="text-sm mt-1">
-                If you're having trouble signing in with NextAuth, try our alternative methods below.
-              </p>
+          {error && (
+            <div className="flex items-start gap-2 p-3 bg-red-50 text-red-700 rounded-md border border-red-200">
+              <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium">Authentication Error</p>
+                <p className="text-sm mt-1">{error}</p>
+              </div>
             </div>
           )}
           
@@ -66,7 +80,7 @@ export default function SignIn() {
             {isLoading ? (
               <div className="flex items-center gap-2">
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                <span>Connecting...</span>
+                <span>Signing in...</span>
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -75,36 +89,9 @@ export default function SignIn() {
               </div>
             )}
           </Button>
-          
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Other Options
-              </span>
-            </div>
-          </div>
-          
-          <div className="flex flex-col space-y-2">
-            <Button variant="outline" asChild>
-              <Link href="/auth/direct-login" className="flex items-center gap-2">
-                <Github className="h-4 w-4" />
-                <span>Alternative GitHub Login</span>
-              </Link>
-            </Button>
-            
-            <Button variant="outline" asChild>
-              <Link href="/fix-auth" className="flex items-center gap-2">
-                <Wrench className="h-4 w-4" />
-                <span>Authentication Troubleshooter</span>
-              </Link>
-            </Button>
-          </div>
         </CardContent>
         <CardFooter className="text-center text-sm text-muted-foreground">
-          By signing in, you accept our terms of service and privacy policy.
+          By signing in, you agree to allow this application to access your GitHub repositories.
         </CardFooter>
       </Card>
     </div>

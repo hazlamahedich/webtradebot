@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
+import { SessionProvider } from "next-auth/react";
 import { useEffect } from "react";
 
 type ThemeAttribute = "class" | "data-theme";
@@ -46,4 +47,12 @@ export function ThemeProvider({
       {children}
     </NextThemesProvider>
   );
+}
+
+export function AuthProvider({
+  children
+}: {
+  children: React.ReactNode;
+}) {
+  return <SessionProvider>{children}</SessionProvider>;
 } 
